@@ -38,3 +38,12 @@ class KeyHistory(db.Model):
     timestamp = db.Column(db.DateTime, default=db.func.now())
     user = db.relationship('Users', backref='key_history')
     used_key = db.relationship('Key', backref='history')
+
+
+class TransferRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    from_user_id = db.Column(db.Integer, nullable=False)
+    to_user_id = db.Column(db.Integer, nullable=False)
+    key_id = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(20), default='pending')  # 'pending', 'approved', 'denied'
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
