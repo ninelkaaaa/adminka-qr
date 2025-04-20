@@ -280,32 +280,106 @@ def return_key():
     db.session.commit()
     return jsonify({"status":"success","message":"Ключ сдан"}),200
 
-
-@api_blueprint.route('/transfer-key', methods=['POST'])
+@api_blueprint.route('/transfer-request', methods=['POST'])
 @cross_origin()
-def transfer_key():
-
+def create_transfer_request():
     data = request.get_json()
     from_user_id = data.get("from_user_id")
     to_user_id = data.get("to_user_id")
     key_id = data.get("key_id")
 
+    # Проверим, что ключ действительно у from_user
     last_record = KeyHistory.query \
         .filter_by(key_id=key_id) \
         .order_by(KeyHistory.timestamp.desc()) \
         .first()
 
     if not last_record or last_record.user_id != from_user_id or last_record.action != "issue":
-        return jsonify({"status":"error","message":"Ключ не у этого пользователя"}),400
+        return jsonify({"status": "error", "message": "Ключ не у этого пользователя"}), 400
 
-    new_hist = KeyHistory(
-        user_id=to_user_id,
+    # Проверим, что нет уже pending-запроса
+    existing = TransferRequest.query.filter_by(
+        from_user_id=from_user_id,
+        to_user_id=to_user_id,
         key_id=key_id,
+        status='pending'
+    ).first()
+
+    if existing:
+        return jsonify({"status": "error", "message": "Запрос уже отправлен"}), 400
+
+    new_request = TransferRequest(
+        from_user_id=from_user_id,
+        to_user_id=to_user_id,
+        key_id=key_id
+    )
+
+    db.session.add(new_request)
+    db.session.commit()
+
+    return jsonify({"status": "success", "message": "Запрос на передачу отправлен"}), 200
+
+
+
+
+@api_blueprint.route('/approve-transfer', methods=['POST'])
+@cross_origin()
+def approve_transfer():
+    data = request.get_json()
+    request_id = data.get("request_id")
+
+    request_record = TransferRequest.query.get(request_id)
+    if not request_record or request_record.status != "pending":
+        return jsonify({"status": "error", "message": "Некорректный запрос"}), 400
+
+    # Обновим историю
+    new_hist = KeyHistory(
+        user_id=request_record.to_user_id,
+        key_id=request_record.key_id,
         action="transfer"
     )
     db.session.add(new_hist)
+
+    request_record.status = "approved"
     db.session.commit()
 
-    return jsonify({"status":"success","message":"Ключ передан другому пользователю"}),200
+    return jsonify({"status": "success", "message": "Ключ успешно передан"}), 200
+
+
+@api_blueprint.route('/deny-transfer', methods=['POST'])
+@cross_origin()
+def deny_transfer():
+    data = request.get_json()
+    request_id = data.get("request_id")
+
+    request_record = TransferRequest.query.get(request_id)
+    if not request_record or request_record.status != "pending":
+        return jsonify({"status": "error", "message": "Некорректный запрос"}), 400
+
+    request_record.status = "denied"
+    db.session.commit()
+
+    return jsonify({"status": "success", "message": "Запрос отклонен"}), 200
+
+@api_blueprint.route('/pending-transfers', methods=['GET'])
+@cross_origin()
+def pending_transfers():
+    try:
+        records = TransferRequest.query.filter_by(status="pending").order_by(TransferRequest.timestamp.desc()).all()
+        result = []
+        for r in records:
+            key = Key.query.get(r.key_id)
+            to_user = Users.query.get(r.to_user_id)
+            result.append({
+                "id": r.id,
+                "key_id": r.key_id,
+                "key_name": f"{key.corpus}.{key.cab}" if key else "??",
+                "to_user_name": to_user.fio if to_user else "??",
+                "from_user_id": r.from_user_id,
+            })
+        return jsonify({"status": "success", "requests": result}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
