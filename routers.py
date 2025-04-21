@@ -58,6 +58,7 @@ def all_keys():
             last_history = KeyHistory.query.filter_by(key_id=key.id).order_by(KeyHistory.timestamp.desc()).first()
             
             user_name = None
+            user_id = None
             if last_history and last_history.user:
                 user_name = last_history.user.fio
                 user_id = last_history.user.id
