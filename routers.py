@@ -290,10 +290,15 @@ def return_key():
 @api_blueprint.route('/transfer-request', methods=['POST'])
 @cross_origin()
 def create_transfer_request():
+    
     data = request.get_json()
+    print("Данные запроса:", data)
+
     from_user_id = data.get("from_user_id")
     to_user_id = data.get("to_user_id")
     key_id = data.get("key_id")
+    
+    print(f" from_user_id={from_user_id}, to_user_id={to_user_id}, key_id={key_id}")
 
     # Проверим, что ключ действительно у from_user
     last_record = KeyHistory.query \
