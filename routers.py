@@ -1,5 +1,7 @@
 from flask import Blueprint, request, jsonify
 from models import Users, Key, KeyHistory
+from models import TransferRequest
+
 from flask_cors import cross_origin
 from app import db
 api_blueprint = Blueprint('api', __name__)
