@@ -60,6 +60,8 @@ def all_keys():
             user_name = None
             if last_history and last_history.user:
                 user_name = last_history.user.fio
+                user_id = last_history.user.id
+
                 
             keys_list.append({
                 "id": key.id,
@@ -68,6 +70,7 @@ def all_keys():
                 "status": key.status,
                 "available": key.status,  # True = доступен, False = выдан
                 "last_user": user_name,
+                "last_user_id": user_id,
                 "key_name": f"{key.corpus}.{key.cab}"  # Форматированное имя ключа
             })
             
