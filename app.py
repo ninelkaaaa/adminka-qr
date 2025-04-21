@@ -2,6 +2,8 @@ from flask import Flask
 from services import db
 from routers import api_blueprint
 from flask_cors import CORS  
+from flask_migrate import Migrate
+migrate = Migrate(app, db)
 
 app = Flask(__name__)
 CORS(app)  
