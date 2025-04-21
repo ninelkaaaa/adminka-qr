@@ -96,6 +96,7 @@ def get_key_history():
             if key and user:
                 history_list.append({
                     "id": record.id,
+                    "user_id": record.user_id,
                     "key_name": f"{key.corpus}.{key.cab}",
                     "user_name": user.fio if user else "Неизвестно",
                     "action": record.action,
