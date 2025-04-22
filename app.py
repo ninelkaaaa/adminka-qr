@@ -3,9 +3,8 @@ from services import db
 from routers import api_blueprint
 from flask_cors import CORS  
 from flask_migrate import Migrate
-migrate = Migrate(app, db)
-
 app = Flask(__name__)
+migrate = Migrate(app, db)
 CORS(app)  
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://aituproject_user:b1KUlQGvxriUeBBnX3CMWGPeEcBRRziy@dpg-cvrk5g8gjchc73bbksq0-a/aituproject'
