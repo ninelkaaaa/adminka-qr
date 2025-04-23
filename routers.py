@@ -503,7 +503,9 @@ def get_user_key_history(user_id):
 
     except Exception as e:
         print(f"Error fetching key history for user {user_id}: {e}") # Log the error
-        return jsonify({"status": "error", "message": f"Ошибка при получении истории: {str(e)}")}),
+        return jsonify({"status": "error",
+                "message": f"Ошибка при получении истории: {str(e)}"}), 500
+
 
 
 
