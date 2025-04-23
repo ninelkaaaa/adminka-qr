@@ -393,5 +393,117 @@ def pending_transfers():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@api_blueprint.route('/users', methods=['GET'])
+@cross_origin()
+def get_users():
+    """Эндпоинт для получения списка всех пользователей."""
+    try:
+        users = Users.query.all()
+        users_list = []
+        for user in users:
+            # Find the last key issued to this user, if any
+            last_issued_key_record = KeyHistory.query \
+                .filter_by(user_id=user.id, action='issue') \
+                .order_by(KeyHistory.timestamp.desc()) \
+                .first()
+
+            current_key_name = None
+            if last_issued_key_record:
+                # Check if this key hasn't been returned or transferred since issue
+                subsequent_action = KeyHistory.query \
+                    .filter(KeyHistory.key_id == last_issued_key_record.key_id,
+                            KeyHistory.timestamp > last_issued_key_record.timestamp,
+                            KeyHistory.action.in_(['return', 'transfer'])) \
+                    .first()
+                if not subsequent_action and last_issued_key_record.used_key:
+                     current_key_name = f"{last_issued_key_record.used_key.corpus}.{last_issued_key_record.used_key.cab}"
+
+
+            users_list.append({
+                "id": user.id,
+                "name": user.fio,  # Assuming 'name' in frontend corresponds to 'fio'
+                "status": "Admin" if user.admin else "Active", # Simple status logic
+                "key": current_key_name, # Show currently held key if any
+                "phone": user.number # Assuming 'phone' corresponds to 'number'
+                # Add other fields if needed, like 'description' if it exists in your model
+            })
+        return jsonify({"status": "success", "users": users_list}), 200
+    except Exception as e:
+        print(f"Error fetching users: {e}") # Log the error
+        return jsonify({"status": "error", "message": f"Internal server error: {str(e)}"}), 500
+
+
+@api_blueprint.route('/users/<int:user_id>', methods=['PUT'])
+@cross_origin()
+def update_user(user_id):
+    """Эндпоинт для обновления данных пользователя (имя/логин, пароль)."""
+    try:
+        user = Users.query.get(user_id)
+        if not user:
+            return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"status": "error", "message": "Нет данных для обновления"}), 400
+
+        # Update name/login (assuming 'name' from frontend maps to 'fio')
+        if 'name' in data and data['name']:
+            user.fio = data['name']
+            # If 'number' is used as login and should be updated too:
+            # user.number = data['name'] # Uncomment if login = name
+
+        # Update password only if provided and not empty
+        if 'password' in data and data['password']:
+            # Add password hashing here in a real application!
+            user.password = data['password']
+
+        db.session.commit()
+        return jsonify({"status": "success", "message": "Данные пользователя обновлены"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating user {user_id}: {e}") # Log the error
+        return jsonify({"status": "error", "message": f"Ошибка при обновлении: {str(e)}"}), 500
+
+
+@api_blueprint.route('/users/<int:user_id>/key-history', methods=['GET'])
+@cross_origin()
+def get_user_key_history(user_id):
+    """Эндпоинт для получения истории ключей конкретного пользователя."""
+    try:
+        limit = request.args.get('limit', 5, type=int) # Get limit from query param, default 5
+
+        user = Users.query.get(user_id)
+        if not user:
+            return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
+
+        history_records = KeyHistory.query \
+            .filter_by(user_id=user_id) \
+            .order_by(KeyHistory.timestamp.desc()) \
+            .limit(limit) \
+            .all()
+
+        history_list = []
+        for record in history_records:
+            key = record.used_key # Use relationship
+            if key:
+                 history_list.append({
+                    "history_id": record.id, # Use history_id for consistency
+                    "key_id": record.key_id,
+                    "key_name": f"{key.corpus}.{key.cab}",
+                    "action": record.action,
+                    "timestamp": record.timestamp.strftime("%Y-%m-%dT%H:%M:%S.%fZ") # ISO format often preferred by JS Date
+                    # "timestamp": record.timestamp.strftime("%d.%m.%Y %H:%M") # Alternative format
+                })
+
+        return jsonify({
+            "status": "success",
+            "history": history_list
+        }), 200
+
+    except Exception as e:
+        print(f"Error fetching key history for user {user_id}: {e}") # Log the error
+        return jsonify({"status": "error", "message": f"Ошибка при получении истории: {str(e)}")}),
+
 
 
