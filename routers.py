@@ -506,6 +506,24 @@ def get_user_key_history(user_id):
         return jsonify({"status": "error",
                 "message": f"Ошибка при получении истории: {str(e)}"}), 500
 
-
+@api_blueprint.route('/users', methods=['POST'])
+@cross_origin()
+def create_user():
+    data = request.get_json() or {}
+    name = data.get('name')
+    password = data.get('password')
+    if not name:
+        return jsonify({"status":"error","message":"Имя пользователя не может быть пустым"}), 400
+    if not password:
+        return jsonify({"status":"error","message":"Пароль не может быть пустым"}), 400
+    try:
+        # Устанавливаем number = name как логин юзера
+        new_user = Users(fio=name, number=name, password=password)
+        db.session.add(new_user)
+        db.session.commit()
+        return jsonify({"status":"success","message":"Пользователь создан","user":{"id":new_user.id,"name":new_user.fio}}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"status":"error","message":str(e)}), 500
 
 
