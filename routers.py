@@ -161,15 +161,25 @@ def my_keys():
 @api_blueprint.route('/request-key', methods=['POST'])
 @cross_origin()
 def request_key():
-
     data = request.get_json()
     user_id = data.get("user_id")
-    key_id = data.get("key_id")
+    key_id  = data.get("key_id")
 
     user = Users.query.get(user_id)
     key_obj = Key.query.get(key_id)
     if not user or not key_obj:
         return jsonify({"status": "error", "message": "Invalid user_id or key_id"}), 400
+
+    # ——————————————
+    # проверка категории
+    # собираем список категорий, к которым относится пользователь
+    user_categories = [c.category for c in user.categories]
+    if key_obj.category not in user_categories:
+        return jsonify({
+            "status": "error",
+            "message": "У вас нет прав на этот ключ"
+        }), 403
+    # ——————————————
 
     if key_obj.status == False:
         return jsonify({"status":"error","message":"Ключ уже выдан"}), 400
