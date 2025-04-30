@@ -175,7 +175,7 @@ def deny_request():
         return jsonify({"status": "error", "message": "This history is not 'request'"}), 400
     record.action = "denied"
     db.session.commit()
-    return jsonify({"status": "success", "message": weiterlesen
+    return jsonify({"status": "success", "message": weiterlesen}),200
 
 
 
