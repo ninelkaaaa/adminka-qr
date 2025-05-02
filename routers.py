@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import Users, Key, KeyHistory
+from models import Users, Key, KeyHistory, Category # Import Category
 from models import TransferRequest
 
 from flask_cors import cross_origin
@@ -529,20 +529,14 @@ def create_user():
 @api_blueprint.route('/categories', methods=['GET'])
 @cross_origin()
 def get_categories():
-    """Endpoint to get all categories for the sidebar"""
+    """Endpoint to get all categories from the database"""
     try:
-        # Assuming you have a Category model. If not, you'll need to create one
-        # Replace this with your actual category data retrieval logic
-        categories = [
-            {"id": 1, "name": "Учебные корпуса"},
-            {"id": 2, "name": "Общежития"},
-            {"id": 3, "name": "Административные"}
-            # Add more default categories as needed
-        ]
+        categories_query = Category.query.all()
+        categories_list = [{"id": cat.id, "name": cat.category} for cat in categories_query] # Use cat.category based on model
         
         return jsonify({
             "status": "success",
-            "categories": categories
+            "categories": categories_list
         })
     except Exception as e:
         print(f"Error fetching categories: {e}")  # Log the error
@@ -557,31 +551,35 @@ def create_category():
         if not data or not data.get('name'):
             return jsonify({"status": "error", "message": "Имя категории не может быть пустым"}), 400
             
-        # Here you would save the new category to your database
-        # Example: new_category = Category(name=data.get('name'))
-        # db.session.add(new_category)
-        # db.session.commit()
+        # Save the new category to the database
+        # Assuming the column name is 'category' as per the model definition
+        new_category = Category(category=data.get('name')) 
+        db.session.add(new_category)
+        db.session.commit()
         
-        # For now, just return success
         return jsonify({
             "status": "success", 
             "message": "Категория создана успешно",
-            "category": {"id": 0, "name": data.get('name')}  # Replace 0 with actual ID
+            "category": {"id": new_category.id, "name": new_category.category} # Return actual ID and name
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
+        print(f"Error creating category: {e}") # Log the error
+        return jsonify({"status": "error", "message": f"Ошибка при создании категории: {str(e)}"}), 500
 
 @api_blueprint.route('/categories/<int:category_id>', methods=['PUT', 'DELETE'])
 @cross_origin()
 def manage_category(category_id):
     """Endpoint to update or delete a category"""
     try:
+        category = Category.query.get(category_id)
+        if not category:
+            return jsonify({"status": "error", "message": "Категория не найдена"}), 404
+
         if request.method == 'DELETE':
-            # Delete logic here
-            # Example: category = Category.query.get(category_id)
-            # db.session.delete(category)
-            # db.session.commit()
+            # Delete logic
+            db.session.delete(category)
+            db.session.commit()
             
             return jsonify({"status": "success", "message": "Категория удалена"})
         
@@ -590,17 +588,16 @@ def manage_category(category_id):
             if not data or not data.get('name'):
                 return jsonify({"status": "error", "message": "Имя категории не может быть пустым"}), 400
             
-            # Update logic here
-            # Example: category = Category.query.get(category_id)
-            # category.name = data.get('name')
-            # db.session.commit()
+            # Update logic
+            category.category = data.get('name') # Update the 'category' field
+            db.session.commit()
             
             return jsonify({
                 "status": "success", 
                 "message": "Категория обновлена",
-                "category": {"id": category_id, "name": data.get('name')}
+                "category": {"id": category.id, "name": category.category} # Return updated data
             })
     except Exception as e:
         db.session.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
-
+        print(f"Error managing category {category_id}: {e}") # Log the error
+        return jsonify({"status": "error", "message": f"Ошибка при управлении категорией: {str(e)}"}), 500
