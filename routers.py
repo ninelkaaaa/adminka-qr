@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
-from models import Users, Key, KeyHistory, Category # Import Category
-from models import TransferRequest
+# Import TransferRequest along with other models
+from models import Users, Key, KeyHistory, Category, TransferRequest 
 
 from flask_cors import cross_origin
 from app import db
@@ -106,7 +106,7 @@ def get_key_history():
                     "key_name": f"{key.corpus}.{key.cab}",
                     "user_name": user.fio if user else "Неизвестно",
                     "action": record.action,
-                    "timestamp": record.timestamp.strftime("%d.%m.%Y %H:%M")  # Исправлена русская буква М на английскую M
+                    "timestamp": record.timestamp.strftime("%d.%m.%Y %H:%М")  # Исправлена русская буква М на английскую M
                 })
             
         return jsonify({
@@ -201,7 +201,7 @@ def pending_requests():
                 "user_name": user_name,
                 "key_id": r.key_id,
                 "key_name": key_name,
-                "timestamp": r.timestamp.strftime("%d.%m.%Y %H:%M")
+                "timestamp": r.timestamp.strftime("%d.%м.%Y %H:%М")
             })
         return jsonify({"status":"success","requests":result}),200
     except Exception as e:
@@ -582,8 +582,8 @@ def get_user_key_history(user_id):
                     "key_id": record.key_id,
                     "key_name": f"{key.corpus}.{key.cab}",
                     "action": record.action,
-                    "timestamp": record.timestamp.strftime("%Y-%m-%dT%H:%M:%S.%fZ") # ISO format often preferred by JS Date
-                    # "timestamp": record.timestamp.strftime("%d.%m.%Y %H:%M") # Alternative format
+                    "timestamp": record.timestamp.strftime("%Y-%m-%dT%H:%М:%S.%fZ") # ISO format often preferred by JS Date
+                    # "timestamp": record.timestamp.strftime("%d.%м.%Y %H:%М") # Alternative format
                 })
 
         return jsonify({
