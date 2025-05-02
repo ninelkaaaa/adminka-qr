@@ -20,6 +20,8 @@ class Users(db.Model):
     number = db.Column(db.String(100), nullable=False, unique=True) # Assuming number is the login
     password = db.Column(db.String(100), nullable=False)
     admin = db.Column(db.Boolean, default=False)
+    # link each user to a role
+    role_id = db.Column(db.Integer, db.ForeignKey('role.id'), nullable=False)
     key_history = db.relationship('KeyHistory', backref='user', lazy=True)
     key_requests = db.relationship('KeyRequest', backref='requester', lazy=True)
     # Add relationship to categories
