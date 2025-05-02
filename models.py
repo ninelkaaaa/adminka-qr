@@ -49,6 +49,10 @@ class KeyHistory(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     action = db.Column(db.String(50), nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    
+    @property
+    def used_key(self):
+        return self.key
 
 class KeyRequest(db.Model):
     __tablename__ = 'key_request'
