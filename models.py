@@ -40,8 +40,10 @@ class Key(db.Model):
     __tablename__ = 'key'
 
     id      = db.Column(db.Integer, primary_key=True)
+    code    = db.Column(db.Text, unique=True, nullable=False)  # Added code field
     cab     = db.Column(db.Integer, nullable=False)
     corpus  = db.Column(db.String(10), nullable=False)
+    status  = db.Column(db.Boolean, nullable=False, default=False)  # Added status field - False = free, True = issued
 
     histories = db.relationship(
         'KeyHistory',
