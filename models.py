@@ -1,6 +1,17 @@
-from services import db
+from app import db
+from sqlalchemy.ext.associationproxy import association_proxy
 from datetime import datetime
 
+# Define association tables
+user_categories = db.Table('user_categories',
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('category_id', db.Integer, db.ForeignKey('category.id'), primary_key=True)
+)
+
+key_category = db.Table('key_category',
+    db.Column('key_id', db.Integer, db.ForeignKey('key.id'), primary_key=True),
+    db.Column('category_id', db.Integer, db.ForeignKey('category.id'), primary_key=True)
+)
 
 class Role(db.Model):
     __tablename__ = 'role'
@@ -8,7 +19,8 @@ class Role(db.Model):
     id   = db.Column(db.Integer, primary_key=True)
     role = db.Column(db.String(50), nullable=False)
 
-    users = db.relationship('Users', back_populates='role')
+    def __repr__(self):
+        return f'<Role {self.role}>'
 
 
 class Users(db.Model):
@@ -21,9 +33,11 @@ class Users(db.Model):
     role_id  = db.Column(db.Integer, db.ForeignKey('role.id'))
     admin    = db.Column(db.Boolean, default=False)
 
-    role       = db.relationship('Role', back_populates='users')
-    categories = db.relationship('Category', back_populates='user')
-    history    = db.relationship('KeyHistory', back_populates='user', cascade='all, delete-orphan')
+    # Define relationships
+    categories = db.relationship('Category', secondary=user_categories, backref='users')
+
+    def __repr__(self):
+        return f'<User {self.fio}>'
 
 
 class Category(db.Model):
@@ -33,23 +47,23 @@ class Category(db.Model):
     user_id  = db.Column(db.Integer, db.ForeignKey('users.id'))
     category = db.Column(db.String(100), nullable=False)
 
-    user = db.relationship('Users', back_populates='categories')
+    def __repr__(self):
+        return f'<Category {self.category}>'
 
 
 class Key(db.Model):
     __tablename__ = 'key'
 
     id      = db.Column(db.Integer, primary_key=True)
-    code    = db.Column(db.Text, unique=True, nullable=False)  # Added code field
-    cab     = db.Column(db.Integer, nullable=False)
-    corpus  = db.Column(db.String(10), nullable=False)
-    status  = db.Column(db.Boolean, nullable=False, default=False)  # Added status field - False = free, True = issued
+    cab     = db.Column(db.String(50))
+    corpus  = db.Column(db.String(10))
+    status  = db.Column(db.Boolean, default=True, nullable=False)
 
-    histories = db.relationship(
-        'KeyHistory',
-        back_populates='key',
-        cascade='all, delete-orphan'
-    )
+    # Define relationships
+    categories = db.relationship('Category', secondary=key_category, backref='keys')
+
+    def __repr__(self):
+        return f'<Key {self.corpus}.{self.cab}>'
 
 
 class KeyHistory(db.Model):
@@ -58,19 +72,32 @@ class KeyHistory(db.Model):
     id        = db.Column(db.Integer, primary_key=True)
     user_id   = db.Column(db.Integer, db.ForeignKey('users.id'))
     key_id    = db.Column(db.Integer, db.ForeignKey('key.id'))
-    action    = db.Column(db.String(50))
-    timestamp = db.Column(db.DateTime, default=db.func.now())
+    action    = db.Column(db.String(50), nullable=False)
+    action_time = db.Column(db.DateTime, default=db.func.current_timestamp())
+    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp(), nullable=False)
 
-    user = db.relationship('Users', back_populates='history')
-    key  = db.relationship('Key', back_populates='histories')
+    # Define relationships
+    user = db.relationship('Users', backref='key_history')
+    used_key = db.relationship('Key', backref='history')
+
+    def __repr__(self):
+        return f'<KeyHistory {self.id}>'
 
 
 class TransferRequest(db.Model):
     __tablename__ = 'transfer_request'
 
     id            = db.Column(db.Integer, primary_key=True)
-    from_user_id  = db.Column(db.Integer, nullable=False)
-    to_user_id    = db.Column(db.Integer, nullable=False)
-    key_id        = db.Column(db.Integer, nullable=False)
-    status        = db.Column(db.String(20), default='pending')  # 'pending', 'approved', 'denied'
-    timestamp     = db.Column(db.DateTime, default=datetime.utcnow)
+    key_id        = db.Column(db.Integer, db.ForeignKey('key.id'), nullable=False)
+    status        = db.Column(db.String(20), default='pending', nullable=False)
+    timestamp     = db.Column(db.DateTime, default=db.func.current_timestamp())
+    to_user_id    = db.Column(db.Integer, db.ForeignKey('users.id'))
+    from_user_id  = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Define relationships
+    key = db.relationship('Key')
+    to_user = db.relationship('Users', foreign_keys=[to_user_id])
+    from_user = db.relationship('Users', foreign_keys=[from_user_id])
+
+    def __repr__(self):
+        return f'<TransferRequest {self.id}>'
