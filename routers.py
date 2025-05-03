@@ -1,7 +1,5 @@
 from flask import Blueprint, request, jsonify
-# Import TransferRequest along with other models
-from models import Users, Key, KeyHistory, Category, TransferRequest 
-
+from models import Users, Key, KeyHistory, Category, TransferRequest
 from flask_cors import cross_origin
 from app import db
 api_blueprint = Blueprint('api', __name__)
@@ -24,7 +22,6 @@ def login():
             "code": 200,
             "admin": user_record.admin,
             "user_id": user_record.id  #обязательно!
-
         })
     else:
         return jsonify({"status": "error", "message": "Неверный логин или пароль"}), 401
