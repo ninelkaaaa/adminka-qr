@@ -687,8 +687,17 @@ def keys_with_categories():
         keys_list = []
         
         for key in keys:
-            # Get key's categories
-            key_categories = [{"id": cat.id, "name": cat.category} for cat in key.categories]
+            # Manually fetch categories for each key
+            key_categories = []
+            category_query = db.session.query(Category).join(
+                db.Table('key_category',
+                    db.Column('key_id', db.Integer, db.ForeignKey('key.id')),
+                    db.Column('category_id', db.Integer, db.ForeignKey('category.id'))
+                )
+            ).filter(db.text('key_category.key_id = :key_id')).params(key_id=key.id)
+            
+            for category in category_query:
+                key_categories.append({"id": category.id, "name": category.category})
             
             # Get last history record for this key
             last_history = KeyHistory.query.filter_by(key_id=key.id).order_by(KeyHistory.timestamp.desc()).first()
@@ -736,16 +745,32 @@ def update_key_categories(key_id):
         if not isinstance(category_ids, list):
             return jsonify({"status": "error", "message": "category_ids должен быть списком"}), 400
 
-        # Fetch Category objects based on the provided IDs
-        categories_to_assign = Category.query.filter(Category.id.in_(category_ids)).all()
+        # Clear existing key categories
+        db.session.execute(
+            db.text("DELETE FROM key_category WHERE key_id = :key_id"),
+            {"key_id": key_id}
+        )
         
-        # Replace existing categories with new ones
-        key.categories = categories_to_assign
+        # Insert new key-category associations
+        for cat_id in category_ids:
+            db.session.execute(
+                db.text("INSERT INTO key_category (key_id, category_id) VALUES (:key_id, :cat_id)"),
+                {"key_id": key_id, "cat_id": cat_id}
+            )
         
         db.session.commit()
         
         # Fetch updated categories for response
-        updated_categories = [{"id": cat.id, "name": cat.category} for cat in key.categories]
+        updated_categories = []
+        category_query = db.session.query(Category).join(
+            db.Table('key_category',
+                db.Column('key_id', db.Integer, db.ForeignKey('key.id')),
+                db.Column('category_id', db.Integer, db.ForeignKey('category.id'))
+            )
+        ).filter(db.text('key_category.key_id = :key_id')).params(key_id=key.id)
+        
+        for category in category_query:
+            updated_categories.append({"id": category.id, "name": category.category})
         
         return jsonify({
             "status": "success",
