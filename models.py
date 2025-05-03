@@ -2,15 +2,17 @@ from app import db
 from sqlalchemy.ext.associationproxy import association_proxy
 from datetime import datetime
 
-# Define association tables
+# Define association tables with extend_existing=True
 user_categories = db.Table('user_categories',
     db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
-    db.Column('category_id', db.Integer, db.ForeignKey('category.id'), primary_key=True)
+    db.Column('category_id', db.Integer, db.ForeignKey('category.id'), primary_key=True),
+    extend_existing=True  # Add this parameter
 )
 
 key_category = db.Table('key_category',
     db.Column('key_id', db.Integer, db.ForeignKey('key.id'), primary_key=True),
-    db.Column('category_id', db.Integer, db.ForeignKey('category.id'), primary_key=True)
+    db.Column('category_id', db.Integer, db.ForeignKey('category.id'), primary_key=True),
+    extend_existing=True  # Add this parameter
 )
 
 class Role(db.Model):
