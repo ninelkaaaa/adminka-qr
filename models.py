@@ -74,3 +74,8 @@ class TransferRequest(db.Model):
     from_user = db.relationship('Users', foreign_keys=[from_user_id])
     to_user   = db.relationship('Users', foreign_keys=[to_user_id])
     key       = db.relationship('Key',   foreign_keys=[key_id])
+
+class KeyCategory(db.Model):
+    __tablename__ = "key_category"
+    key_id      = db.Column(db.Integer, db.ForeignKey("key.id"), primary_key=True)
+    category_id = db.Column(db.Integer, db.ForeignKey("category.id"), primary_key=True)
