@@ -4,6 +4,5 @@ flask-cors
 flask_sqlalchemy
 gunicorn
 psycopg2
-psycopg2-binary
 python-dotenv
 datetime
