@@ -210,24 +210,27 @@ def pending_requests():
 @api_blueprint.route('/approve-request', methods=['POST'])
 @cross_origin()
 def approve_request():
-
     data = request.get_json()
     hist_id = data.get("history_id")
 
     record = KeyHistory.query.get(hist_id)
     if not record:
         return jsonify({"status":"error","message":"No such request"}),404
+    if record.action not in ("request", "request_return"):
+        return jsonify({"status":"error","message":"Not a pending request"}),400
+    if record.action == "request
+        record.action = "issue"
+        if record.used_key:
+            record.used_key.status = False
+        message = "Ключ выдан"
+    else:                                     
+        record.action = "return"
+        if record.used_key:
+            record.used_key.status = True
+        message = "Ключ принят и помещён в шкаф"
 
-    if record.action != "request":
-        return jsonify({"status":"error","message":"This history is not 'request'"}),400
-
-    # Выдаём ключ
-    record.action = "issue"
-    if record.used_key:
-        record.used_key.status = False  # ключ выдан
     db.session.commit()
-
-    return jsonify({"status":"success","message":"Ключ выдан"}),200
+    return jsonify({"status":"success","message": message}),200
 
 
 @api_blueprint.route('/deny-request', methods=['POST'])
@@ -239,13 +242,11 @@ def deny_request():
     record = KeyHistory.query.get(hist_id)
     if not record:
         return jsonify({"status":"error","message":"No such request"}),404
-
-    if record.action != "request":
-        return jsonify({"status":"error","message":"This history is not 'request'"}),400
+    if record.action not in ("request", "request_return"):
+        return jsonify({"status":"error","message":"Not a pending request"}),400
 
     record.action = "denied"
     db.session.commit()
-
     return jsonify({"status":"success","message":"Запрос отклонён"}),200
 
 
