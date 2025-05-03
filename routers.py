@@ -158,31 +158,37 @@ def my_keys():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+
 @api_blueprint.route('/request-key', methods=['POST'])
 @cross_origin()
 def request_key():
-
-    data = request.get_json()
+    data    = request.get_json() or {}
     user_id = data.get("user_id")
-    key_id = data.get("key_id")
-
+    key_id  = data.get("key_id")
+    is_return = data.get("return", False) 
+    
     user = Users.query.get(user_id)
-    key_obj = Key.query.get(key_id)
-    if not user or not key_obj:
-        return jsonify({"status": "error", "message": "Invalid user_id or key_id"}), 400
+    key  = Key.query.get(key_id)
+    if not user or not key:
+        return jsonify({"status":"error","message":"Invalid user_id or key_id"}), 400
 
-    if key_obj.status == False:
+    if not is_return and key.status is False:
         return jsonify({"status":"error","message":"Ключ уже выдан"}), 400
+ 
+
+    action_name = "request_return" if is_return else "request"
 
     new_hist = KeyHistory(
         user_id=user_id,
         key_id=key_id,
-        action="request"
+        action=action_name
     )
     db.session.add(new_hist)
     db.session.commit()
 
-    return jsonify({"status":"success","message":"Запрос на получение ключа отправлен"}),200
+    msg = "Запрос на сдачу ключа отправлен" if is_return else "Запрос на получение ключа отправлен"
+    return jsonify({"status":"success","message": msg}), 200
+
 
 @api_blueprint.route('/pending-requests', methods=['GET'])
 @cross_origin()
