@@ -1,11 +1,14 @@
 from services import db
 from datetime import datetime
 
+
 class Role(db.Model):
     __tablename__ = 'role'
 
     id   = db.Column(db.Integer, primary_key=True)
     role = db.Column(db.String(50), nullable=False)
+
+    users = db.relationship('Users', back_populates='role')
 
 
 class Users(db.Model):
@@ -18,7 +21,9 @@ class Users(db.Model):
     role_id  = db.Column(db.Integer, db.ForeignKey('role.id'))
     admin    = db.Column(db.Boolean, default=False)
 
-    role = db.relationship('Role', backref='users')
+    role       = db.relationship('Role', back_populates='users')
+    categories = db.relationship('Category', back_populates='user')
+    history    = db.relationship('KeyHistory', back_populates='user', cascade='all, delete-orphan')
 
 
 class Category(db.Model):
@@ -28,17 +33,21 @@ class Category(db.Model):
     user_id  = db.Column(db.Integer, db.ForeignKey('users.id'))
     category = db.Column(db.String(100), nullable=False)
 
-    user = db.relationship('Users', backref='categories')
+    user = db.relationship('Users', back_populates='categories')
 
 
 class Key(db.Model):
     __tablename__ = 'key'
 
-    id     = db.Column(db.Integer, primary_key=True)
-    cab    = db.Column(db.Integer, nullable=False)
-    corpus = db.Column(db.String(10), nullable=False)
+    id      = db.Column(db.Integer, primary_key=True)
+    cab     = db.Column(db.Integer, nullable=False)
+    corpus  = db.Column(db.String(10), nullable=False)
 
-    histories = db.relationship('KeyHistory', backref='used_key')
+    histories = db.relationship(
+        'KeyHistory',
+        back_populates='key',
+        cascade='all, delete-orphan'
+    )
 
 
 class KeyHistory(db.Model):
@@ -50,8 +59,8 @@ class KeyHistory(db.Model):
     action    = db.Column(db.String(50))
     timestamp = db.Column(db.DateTime, default=db.func.now())
 
-    user     = db.relationship('Users', backref='key_history')
-    used_key = db.relationship('Key', backref='history')
+    user = db.relationship('Users', back_populates='history')
+    key  = db.relationship('Key', back_populates='histories')
 
 
 class TransferRequest(db.Model):
@@ -61,5 +70,5 @@ class TransferRequest(db.Model):
     from_user_id  = db.Column(db.Integer, nullable=False)
     to_user_id    = db.Column(db.Integer, nullable=False)
     key_id        = db.Column(db.Integer, nullable=False)
-    status        = db.Column(db.String(20), default='pending')
+    status        = db.Column(db.String(20), default='pending')  # 'pending', 'approved', 'denied'
     timestamp     = db.Column(db.DateTime, default=datetime.utcnow)
