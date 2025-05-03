@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import Users, Key, KeyHistory, Category, TransferRequest
+from models import Users, Key, KeyHistory, Category, TransferRequest, key_category
 from flask_cors import cross_origin
 from app import db
 api_blueprint = Blueprint('api', __name__)
@@ -698,16 +698,9 @@ def keys_with_categories():
         keys_list = []
         
         for key in keys:
-            # Manually fetch categories for each key
+            # Fetch categories using the pre-defined relationship
             key_categories = []
-            category_query = db.session.query(Category).join(
-                db.Table('key_category',
-                    db.Column('key_id', db.Integer, db.ForeignKey('key.id')),
-                    db.Column('category_id', db.Integer, db.ForeignKey('category.id'))
-                )
-            ).filter(db.text('key_category.key_id = :key_id')).params(key_id=key.id)
-            
-            for category in category_query:
+            for category in key.categories:
                 key_categories.append({"id": category.id, "name": category.category})
             
             # Get last history record for this key
@@ -756,32 +749,14 @@ def update_key_categories(key_id):
         if not isinstance(category_ids, list):
             return jsonify({"status": "error", "message": "category_ids должен быть списком"}), 400
 
-        # Clear existing key categories
-        db.session.execute(
-            db.text("DELETE FROM key_category WHERE key_id = :key_id"),
-            {"key_id": key_id}
-        )
-        
-        # Insert new key-category associations
-        for cat_id in category_ids:
-            db.session.execute(
-                db.text("INSERT INTO key_category (key_id, category_id) VALUES (:key_id, :cat_id)"),
-                {"key_id": key_id, "cat_id": cat_id}
-            )
+        # Get the categories and assign them directly using the relationship
+        categories_to_assign = Category.query.filter(Category.id.in_(category_ids)).all()
+        key.categories = categories_to_assign
         
         db.session.commit()
         
-        # Fetch updated categories for response
-        updated_categories = []
-        category_query = db.session.query(Category).join(
-            db.Table('key_category',
-                db.Column('key_id', db.Integer, db.ForeignKey('key.id')),
-                db.Column('category_id', db.Integer, db.ForeignKey('category.id'))
-            )
-        ).filter(db.text('key_category.key_id = :key_id')).params(key_id=key.id)
-        
-        for category in category_query:
-            updated_categories.append({"id": category.id, "name": category.category})
+        # Use the updated relationship data
+        updated_categories = [{"id": cat.id, "name": cat.category} for cat in key.categories]
         
         return jsonify({
             "status": "success",
