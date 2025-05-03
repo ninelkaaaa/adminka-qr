@@ -63,7 +63,7 @@ class KeyRequest(db.Model):
     status = db.Column(db.String(20), nullable=False, default='pending')
 
 class TransferRequest(db.Model):
-    __tablename__ = 'transfer_requests'
+    __tablename__ = 'transfer_request'
     id = db.Column(db.Integer, primary_key=True)
     from_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     to_user_id   = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
