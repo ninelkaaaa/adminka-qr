@@ -1,5 +1,5 @@
 from services import db
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 # Association table for the many-to-many relationship between Users and Category
 user_categories = db.Table('user_categories',
@@ -48,8 +48,11 @@ class KeyHistory(db.Model):
     key_id = db.Column(db.Integer, db.ForeignKey('key.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     action = db.Column(db.String(50), nullable=False)
-    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    
+   timestamp = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc) + timedelta(hours=5)
+    )
     @property
     def used_key(self):
         return self.key
@@ -59,7 +62,11 @@ class KeyRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     key_id = db.Column(db.Integer, db.ForeignKey('key.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    request_time = db.Column(db.DateTime, nullable=False, default=datetime.now)
+      request_time = db.Column(
+            db.DateTime(timezone=True),
+            nullable=False,
+            default=lambda: datetime.now(timezone.utc) + timedelta(hours=5)
+        )
     status = db.Column(db.String(20), nullable=False, default='pending')
 
 class TransferRequest(db.Model):
@@ -69,8 +76,11 @@ class TransferRequest(db.Model):
     to_user_id   = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     key_id       = db.Column(db.Integer, db.ForeignKey('key.id'), nullable=False)
     status       = db.Column(db.String(20), nullable=False, default='pending')
-    timestamp    = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-
+    timestamp = db.Column(
+            db.DateTime(timezone=True),
+            nullable=False,
+            default=lambda: datetime.now(timezone.utc) + timedelta(hours=5)
+        )
     from_user = db.relationship('Users', foreign_keys=[from_user_id])
     to_user   = db.relationship('Users', foreign_keys=[to_user_id])
     key       = db.relationship('Key',   foreign_keys=[key_id])
