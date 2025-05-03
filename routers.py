@@ -677,3 +677,86 @@ def manage_category(category_id):
         db.session.rollback()
         print(f"Error managing category {category_id}: {e}") # Log the error
         return jsonify({"status": "error", "message": f"Ошибка при управлении категорией: {str(e)}"}), 500
+
+@api_blueprint.route('/keys-with-categories', methods=['GET'])
+@cross_origin()
+def keys_with_categories():
+    """Get all keys with their assigned categories"""
+    try:
+        keys = Key.query.all()
+        keys_list = []
+        
+        for key in keys:
+            # Get key's categories
+            key_categories = [{"id": cat.id, "name": cat.category} for cat in key.categories]
+            
+            # Get last history record for this key
+            last_history = KeyHistory.query.filter_by(key_id=key.id).order_by(KeyHistory.timestamp.desc()).first()
+            
+            user_name = None
+            user_id = None
+            if last_history and last_history.user:
+                user_name = last_history.user.fio
+                user_id = last_history.user.id
+                
+            keys_list.append({
+                "id": key.id,
+                "cab": key.cab,
+                "corpus": key.corpus,
+                "status": key.status,
+                "available": key.status,  # True = доступен, False = выдан
+                "last_user": user_name,
+                "last_user_id": user_id,
+                "key_name": f"{key.corpus}.{key.cab}",  # Форматированное имя ключа
+                "categories": key_categories  # Add categories to the response
+            })
+            
+        return jsonify({
+            "status": "success",
+            "keys": keys_list
+        })
+    except Exception as e:
+        print(f"Error fetching keys with categories: {e}")  # Log the error
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api_blueprint.route('/keys/<int:key_id>/categories', methods=['PUT'])
+@cross_origin()
+def update_key_categories(key_id):
+    """Update categories for a specific key"""
+    try:
+        key = Key.query.get(key_id)
+        if not key:
+            return jsonify({"status": "error", "message": "Ключ не найден"}), 404
+
+        data = request.get_json()
+        if not data or 'category_ids' not in data:
+            return jsonify({"status": "error", "message": "Отсутствуют данные категорий"}), 400
+
+        category_ids = data['category_ids']
+        if not isinstance(category_ids, list):
+            return jsonify({"status": "error", "message": "category_ids должен быть списком"}), 400
+
+        # Fetch Category objects based on the provided IDs
+        categories_to_assign = Category.query.filter(Category.id.in_(category_ids)).all()
+        
+        # Replace existing categories with new ones
+        key.categories = categories_to_assign
+        
+        db.session.commit()
+        
+        # Fetch updated categories for response
+        updated_categories = [{"id": cat.id, "name": cat.category} for cat in key.categories]
+        
+        return jsonify({
+            "status": "success",
+            "message": "Категории ключа обновлены",
+            "key": {
+                "id": key.id,
+                "key_name": f"{key.corpus}.{key.cab}",
+                "categories": updated_categories
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating key categories for key {key_id}: {e}")  # Log the error
+        return jsonify({"status": "error", "message": f"Ошибка при обновлении категорий: {str(e)}"}), 500
