@@ -218,7 +218,7 @@ def approve_request():
         return jsonify({"status":"error","message":"No such request"}),404
     if record.action not in ("request", "request_return"):
         return jsonify({"status":"error","message":"Not a pending request"}),400
-    if record.action == "request:
+    if record.action == "request":
         record.action = "issue"
         if record.used_key:
             record.used_key.status = False
