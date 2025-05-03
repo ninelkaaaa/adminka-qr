@@ -200,12 +200,16 @@ def pending_requests():
 
     result = []
     for r in records:
+        # Replace used_key with direct Key query
+        key = Key.query.get(r.key_id)
+        key_name = f"{key.corpus}.{key.cab}" if key else "??"
+        
         result.append({
             "history_id": r.id,
             "user_id"   : r.user_id,
             "user_name" : r.user.fio if r.user else "??",
             "key_id"    : r.key_id,
-            "key_name"  : f"{r.used_key.corpus}.{r.used_key.cab}" if r.used_key else "??",
+            "key_name"  : key_name,
             "timestamp" : r.timestamp.strftime("%d.%m.%Y %H:%M"),
             "action"    : r.action 
         })
@@ -224,15 +228,19 @@ def approve_request():
         return jsonify({"status":"error","message":"No such request"}),404
     if record.action not in ("request", "request_return"):
         return jsonify({"status":"error","message":"Not a pending request"}),400
+    
+    # Get key directly instead of using record.used_key
+    key = Key.query.get(record.key_id)
+    
     if record.action == "request":
         record.action = "issue"
-        if record.used_key:
-            record.used_key.status = False
+        if key:
+            key.status = False
         message = "Ключ выдан"
     else:                                     
         record.action = "return"
-        if record.used_key:
-            record.used_key.status = True
+        if key:
+            key.status = True
         message = "Ключ принят и помещён в шкаф"
 
     db.session.commit()
@@ -286,7 +294,9 @@ def return_key():
         action="return"
     )
     db.session.add(new_hist)
-    key_obj = last_record.used_key
+    
+    # Get key directly instead of using last_record.used_key
+    key_obj = Key.query.get(key_id)
     if key_obj:
         key_obj.status = True
 
@@ -421,10 +431,13 @@ def get_users():
                              KeyHistory.timestamp > last_issued_key_record.timestamp,
                              KeyHistory.action.in_(['return', 'transfer'])) \
                      .first()
-                 if not subsequent_action and last_issued_key_record.used_key:
-                      current_key_name = f"{last_issued_key_record.used_key.corpus}.{last_issued_key_record.used_key.cab}"
+                 
+                 # Get key directly instead of using last_issued_key_record.used_key
+                 key = Key.query.get(last_issued_key_record.key_id)
+                 if not subsequent_action and key:
+                      current_key_name = f"{key.corpus}.{key.cab}"
 
-
+             # ...rest of existing code...
              # Get user's categories
              user_categories = [{"id": cat.id, "name": cat.category} for cat in user.categories]
 
@@ -581,15 +594,16 @@ def get_user_key_history(user_id):
 
         history_list = []
         for record in history_records:
-            key = record.used_key # Use relationship
+            # Get key directly instead of using record.used_key
+            key = Key.query.get(record.key_id)
             if key:
                  history_list.append({
                     "history_id": record.id, # Use history_id for consistency
                     "key_id": record.key_id,
                     "key_name": f"{key.corpus}.{key.cab}",
                     "action": record.action,
-                    "timestamp": record.timestamp.strftime("%Y-%m-%dT%H:%М:%S.%fZ") # ISO format often preferred by JS Date
-                    # "timestamp": record.timestamp.strftime("%d.%м.%Y %H:%М") # Alternative format
+                    "timestamp": record.timestamp.strftime("%Y-%m-%dT%H:%M:%S.%fZ") # ISO format often preferred by JS Date
+                    # Fix Russian 'М' to 'M'
                 })
 
         return jsonify({
