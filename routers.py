@@ -184,28 +184,27 @@ def request_key():
 
     return jsonify({"status":"success","message":"Запрос на получение ключа отправлен"}),200
 
-
 @api_blueprint.route('/pending-requests', methods=['GET'])
 @cross_origin()
 def pending_requests():
+    records = (KeyHistory.query
+               .filter(KeyHistory.action.in_(["request", "request_return"]))
+               .order_by(KeyHistory.timestamp.desc())
+               .all())
 
-    try:
-        records = KeyHistory.query.filter_by(action="request").order_by(KeyHistory.timestamp.desc()).all()
-        result = []
-        for r in records:
-            user_name = r.user.fio if r.user else "??"
-            key_name = f"{r.used_key.corpus}.{r.used_key.cab}" if r.used_key else "??"
-            result.append({
-                "history_id": r.id,
-                "user_id": r.user_id,
-                "user_name": user_name,
-                "key_id": r.key_id,
-                "key_name": key_name,
-                "timestamp": r.timestamp.strftime("%d.%м.%Y %H:%М")
-            })
-        return jsonify({"status":"success","requests":result}),200
-    except Exception as e:
-        return jsonify({"status":"error","message":str(e)}),500
+    result = []
+    for r in records:
+        result.append({
+            "history_id": r.id,
+            "user_id"   : r.user_id,
+            "user_name" : r.user.fio if r.user else "??",
+            "key_id"    : r.key_id,
+            "key_name"  : f"{r.used_key.corpus}.{r.used_key.cab}" if r.used_key else "??",
+            "timestamp" : r.timestamp.strftime("%d.%m.%Y %H:%M"),
+            "action"    : r.action 
+        })
+    return jsonify({"status":"success","requests":result}), 200
+
 
 
 @api_blueprint.route('/approve-request', methods=['POST'])
