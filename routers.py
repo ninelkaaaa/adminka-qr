@@ -103,7 +103,7 @@ def get_key_history():
                     "key_name": f"{key.corpus}.{key.cab}",
                     "user_name": user.fio if user else "Неизвестно",
                     "action": record.action,
-                    "timestamp": record.timestamp.strftime("%d.%m.%Y %H:%М")  # Исправлена русская буква М на английскую M
+                    "timestamp": record.timestamp.strftime("%d.%m.%Y %H:%M")  # Исправлена русская буква М на английскую M
                 })
             
         return jsonify({
