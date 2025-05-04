@@ -759,28 +759,33 @@ def delete_user(user_id):
         if not user:
             return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
 
-        # вернуть выданные ключи...
-        # ...existing return-keys code...
+        # вернуть все выданные пользователю ключи и записать в историю
+        issued_keys = Key.query.filter_by(status=False).all()
+        for key in issued_keys:
+            last = KeyHistory.query.filter_by(key_id=key.id) \
+                   .order_by(KeyHistory.timestamp.desc()).first()
+            if last and last.user_id == user_id and last.action == 'issue':
+                db.session.add(KeyHistory(user_id=user_id, key_id=key.id, action='return'))
+                key.status = True
 
-        # удалить историю ключей пользователя
+        # удалить всю историю ключей пользователя
         KeyHistory.query.filter_by(user_id=user_id).delete()
 
-        # удалить all transfer requests involving user
+        # удалить все transfer-запросы, где участвует пользователь
         TransferRequest.query.filter(
             (TransferRequest.from_user_id == user_id) |
             (TransferRequest.to_user_id   == user_id)
         ).delete(synchronize_session=False)
 
-        # обнулить ownership категорий (если есть user_id в Category)
-        Category.query.filter_by(user_id=user_id).update({ "user_id": None })
-
-        # очистить m2m-связь: key_category при необходимости
+        # обнулить ownership в категориях и очистить m2m
+        Category.query.filter_by(user_id=user_id).update({"user_id": None})
         user.categories = []
 
         # удалить пользователя
         db.session.delete(user)
         db.session.commit()
         return jsonify({"status": "success", "message": "Пользователь и его данные удалены"}), 200
+
     except Exception as e:
         db.session.rollback()
         print(f"Error deleting user {user_id}: {e}")
