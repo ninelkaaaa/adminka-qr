@@ -453,6 +453,8 @@ def update_user(user_id):
             else:
                  # Handle potential error if category_ids is not a list
                  return jsonify({"status": "error", "message": "category_ids должен быть списком"}), 400
+        if 'admin' in data:
+            user.admin = bool(data['admin'])
             
         db.session.commit()
         # Fetch updated user categories to return
@@ -511,7 +513,8 @@ def create_user():
         return jsonify({"status": "error", "message": f"Пользователь с телефоном {phone} уже существует"}), 409 # 409 Conflict
     try:
         # Use phone as the 'number' (login) field
-        new_user = Users(fio=name, number=phone, password=password if password else '') # Handle potentially empty password
+        admin_flag = data.get('admin', False)
+        new_user = Users(fio=name, number=phone, password=password if password else '', admin=bool(admin_flag)) # Handle potentially empty password
         # Fetch and assign categories
         if category_ids and isinstance(category_ids, list):
              categories_to_assign = Category.query.filter(Category.id.in_(category_ids)).all()
