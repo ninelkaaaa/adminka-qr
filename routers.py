@@ -750,3 +750,19 @@ def available_keys_for_user(user_id):
     except Exception as e:
         print(f"Error in available-keys-for-user: {e}")
         return jsonify({"status":"error","message":str(e)}), 500
+
+@api_blueprint.route('/users/<int:user_id>', methods=['DELETE'])
+@cross_origin()
+def delete_user(user_id):
+    try:
+        user = Users.query.get(user_id)
+        if not user:
+            return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
+
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({"status": "success", "message": "Пользователь удален"}), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting user {user_id}: {e}")
+        return jsonify({"status": "error", "message": f"Ошибка при удалении пользователя: {str(e)}"}), 500
