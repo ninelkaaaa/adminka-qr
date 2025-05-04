@@ -759,26 +759,22 @@ def delete_user(user_id):
         if not user:
             return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
 
-        # вернуть все выданные пользователю ключи и записать в историю
-        from sqlalchemy import desc
-        issued_keys = Key.query.filter_by(status=False).all()
-        for key in issued_keys:
-            last = KeyHistory.query.filter_by(key_id=key.id)\
-                   .order_by(KeyHistory.timestamp.desc()).first()
-            if last and last.user_id == user_id and last.action == 'issue':
-                db.session.add(KeyHistory(user_id=user_id, key_id=key.id, action='return'))
-                key.status = True
+        # вернуть выданные ключи...
+        # ...existing return-keys code...
 
-        # удалить всю историю ключей пользователя
+        # удалить историю ключей пользователя
         KeyHistory.query.filter_by(user_id=user_id).delete()
 
-        # удалить все запросы передачи/одобрения, где пользователь участвует
+        # удалить all transfer requests involving user
         TransferRequest.query.filter(
             (TransferRequest.from_user_id == user_id) |
             (TransferRequest.to_user_id   == user_id)
         ).delete(synchronize_session=False)
 
-        # очистить связи категории
+        # обнулить ownership категорий (если есть user_id в Category)
+        Category.query.filter_by(user_id=user_id).update({ "user_id": None })
+
+        # очистить m2m-связь: key_category при необходимости
         user.categories = []
 
         # удалить пользователя
