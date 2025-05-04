@@ -759,9 +759,23 @@ def delete_user(user_id):
         if not user:
             return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
 
+        # вернуть все выданные пользователю ключи и записать в историю
+        from sqlalchemy import desc
+        issued_keys = Key.query.filter_by(status=False).all()
+        for key in issued_keys:
+            last = KeyHistory.query.filter_by(key_id=key.id)\
+                   .order_by(KeyHistory.timestamp.desc()).first()
+            if last and last.user_id == user_id and last.action == 'issue':
+                db.session.add(KeyHistory(user_id=user_id, key_id=key.id, action='return'))
+                key.status = True
+
+        # удалить всю историю пользователя
+        KeyHistory.query.filter_by(user_id=user_id).delete()
+
+        # удалить самого пользователя
         db.session.delete(user)
         db.session.commit()
-        return jsonify({"status": "success", "message": "Пользователь удален"}), 200
+        return jsonify({"status": "success", "message": "Пользователь и его история удалены"}), 200
     except Exception as e:
         db.session.rollback()
         print(f"Error deleting user {user_id}: {e}")
