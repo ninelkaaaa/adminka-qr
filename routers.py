@@ -769,13 +769,22 @@ def delete_user(user_id):
                 db.session.add(KeyHistory(user_id=user_id, key_id=key.id, action='return'))
                 key.status = True
 
-        # удалить всю историю пользователя
+        # удалить всю историю ключей пользователя
         KeyHistory.query.filter_by(user_id=user_id).delete()
 
-        # удалить самого пользователя
+        # удалить все запросы передачи/одобрения, где пользователь участвует
+        TransferRequest.query.filter(
+            (TransferRequest.from_user_id == user_id) |
+            (TransferRequest.to_user_id   == user_id)
+        ).delete(synchronize_session=False)
+
+        # очистить связи категории
+        user.categories = []
+
+        # удалить пользователя
         db.session.delete(user)
         db.session.commit()
-        return jsonify({"status": "success", "message": "Пользователь и его история удалены"}), 200
+        return jsonify({"status": "success", "message": "Пользователь и его данные удалены"}), 200
     except Exception as e:
         db.session.rollback()
         print(f"Error deleting user {user_id}: {e}")
