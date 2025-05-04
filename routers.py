@@ -159,49 +159,36 @@ def my_keys():
 @api_blueprint.route('/request-key', methods=['POST'])
 @cross_origin()
 def request_key():
-    data = request.get_json() or {}
-    user_id = data.get("user_id")
-    key_id = data.get("key_id")
-    is_return = data.get("return", False) 
-    
+    data       = request.get_json() or {}
+    user_id    = data.get("user_id")
+    key_id     = data.get("key_id")
+    is_return  = data.get("return", False)
+
     user = Users.query.get(user_id)
-    key = Key.query.get(key_id)
+    key  = Key.query.get(key_id)
     if not user or not key:
         return jsonify({"status":"error","message":"Invalid user_id or key_id"}), 400
 
     if not is_return and key.status is False:
         return jsonify({"status":"error","message":"Ключ уже выдан"}), 400
-    
-    # Skip category check for return requests - users should always be able to return keys
+
     if not is_return:
-        # Get user categories
-        user_categories = set(cat.id for cat in user.categories)
-        
-        # Get key categories
-        key_categories = set(cat.id for cat in key.categories)
-        
-        # If key has categories and user doesn't have any matching categories
-        if key_categories and not (user_categories & key_categories):
-            # Check if user is admin, admins can request any key
-            if not user.admin:
-                return jsonify({
-                    "status": "error",
-                    "message": "У вас нет прав на запрос этого ключа"
-                }), 403
+        # Проверяем категории пользователя и ключа
+        user_cats = {cat.id for cat in user.categories}
+        key_cats  = {cat.id for cat in key.categories}
+        if key_cats and not (user_cats & key_cats) and not user.admin:
+            return jsonify({
+                "status": "error",
+                "message": "У вас нет прав на запрос этого ключа"
+            }), 403
 
     action_name = "request_return" if is_return else "request"
-
-    new_hist = KeyHistory(
-        user_id=user_id,
-        key_id=key_id,
-        action=action_name
-    )
+    new_hist    = KeyHistory(user_id=user_id, key_id=key_id, action=action_name)
     db.session.add(new_hist)
     db.session.commit()
 
     msg = "Запрос на сдачу ключа отправлен" if is_return else "Запрос на получение ключа отправлен"
     return jsonify({"status":"success","message": msg}), 200
-
 
 @api_blueprint.route('/pending-requests', methods=['GET'])
 @cross_origin()
@@ -231,7 +218,6 @@ def pending_requests():
 def approve_request():
     data = request.get_json()
     hist_id = data.get("history_id")
-
     record = KeyHistory.query.get(hist_id)
     if not record:
         return jsonify({"status":"error","message":"No such request"}),404
@@ -258,7 +244,6 @@ def approve_request():
 def deny_request():
     data = request.get_json()
     hist_id = data.get("history_id")
-
     record = KeyHistory.query.get(hist_id)
     if not record:
         return jsonify({"status":"error","message":"No such request"}),404
@@ -269,7 +254,6 @@ def deny_request():
     db.session.commit()
     return jsonify({"status":"success","message":"Запрос отклонён"}),200
 
-@api_blueprint.route('/deny-request', methods=['POST'])
 @api_blueprint.route('/return-key', methods=['POST'])
 @cross_origin()
 def return_key():
@@ -283,14 +267,12 @@ def return_key():
     data = request.get_json()
     user_id = data.get("user_id")
     key_id = data.get("key_id")
-
     # Найдём последнюю запись, удостоверимся, что ключ действительно у user_id
     from sqlalchemy import desc
     last_record = KeyHistory.query \
         .filter_by(key_id=key_id) \
         .order_by(KeyHistory.timestamp.desc()) \
         .first()
-
     if not last_record or last_record.user_id != user_id or last_record.action != "issue":
         return jsonify({"status":"error","message":"Этот ключ сейчас не у вас"}),400
 
@@ -324,7 +306,6 @@ def create_transfer_request():
         .first()
     if not last_record or last_record.user_id != from_user_id or last_record.action != "issue":
         return jsonify({"status": "error", "message": "Ключ не у этого пользователя"}), 400
-
     # Проверим, что нет уже pending-запроса
     existing = TransferRequest.query.filter_by(
         from_user_id=from_user_id,
@@ -334,7 +315,6 @@ def create_transfer_request():
     ).first()
     if existing:
         return jsonify({"status": "error", "message": "Запрос уже отправлен"}), 400
-
     new_request = TransferRequest(
         from_user_id=from_user_id,
         to_user_id=to_user_id,
@@ -353,7 +333,6 @@ def approve_transfer():
     request_record = TransferRequest.query.get(request_id)
     if not request_record or request_record.status != "pending":
         return jsonify({"status": "error", "message": "Некорректный запрос"}), 400
-
     # Обновим историю
     new_hist = KeyHistory(
         user_id=request_record.to_user_id,
@@ -452,22 +431,18 @@ def update_user(user_id):
         data = request.get_json()
         if not data:
             return jsonify({"status": "error", "message": "Нет данных для обновления"}), 400
-
         # Update name/login
         if 'name' in data and data['name']:
             user.fio = data['name']
             # Consider if 'number' (login) should also be updated based on 'name'
             # user.number = data['name']
-
         # Update password
         if 'password' in data and data['password']:
             # !! Add password hashing here in a real application !!
             user.password = data['password']
-
         # Update phone number if provided
         if 'phone' in data: # Check if 'phone' key exists
              user.number = data['phone'] # Assuming phone maps to number field
-
         # Update categories
         if 'category_ids' in data: # Check if category_ids are provided
             category_ids = data['category_ids']
@@ -499,8 +474,21 @@ def update_user(user_id):
         print(f"Error updating user {user_id}: {e}") # Log the error
         return jsonify({"status": "error", "message": f"Ошибка при обновлении: {str(e)}"}), 500
         return jsonify({
-# ... (keep get_user_key_history as is) ...
             "message": "Данные пользователя обновлены",
+            "user": {
+                "id": user.id,
+                "name": user.fio,
+                "phone": user.number,
+                "status": "Admin" if user.admin else "Active",
+                "categories": updated_categories
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating user {user_id}: {e}") # Log the error
+        return jsonify({"status": "error", "message": f"Ошибка при обновлении: {str(e)}"}), 500
+
 @api_blueprint.route('/users', methods=['POST'])
 @cross_origin()
 def create_user():
@@ -517,12 +505,10 @@ def create_user():
     #     return jsonify({"status":"error","message":"Пароль не может быть пустым"}), 400
     if not phone:
          return jsonify({"status":"error","message":"Телефон не может быть пустым"}), 400
-
     # Check if user with this phone number already exists
     existing_user = Users.query.filter_by(number=phone).first()
     if existing_user:
         return jsonify({"status": "error", "message": f"Пользователь с телефоном {phone} уже существует"}), 409 # 409 Conflict
-
     try:
         # Use phone as the 'number' (login) field
         new_user = Users(fio=name, number=phone, password=password if password else '') # Handle potentially empty password
@@ -530,10 +516,8 @@ def create_user():
         if category_ids and isinstance(category_ids, list):
              categories_to_assign = Category.query.filter(Category.id.in_(category_ids)).all()
              new_user.categories = categories_to_assign
-
         db.session.add(new_user)
         db.session.commit()
-
         # Get assigned categories for the response
         assigned_categories = [{"id": cat.id, "name": cat.category} for cat in new_user.categories]
         
@@ -563,13 +547,11 @@ def get_user_key_history(user_id):
         user = Users.query.get(user_id)
         if not user:
             return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
-
         history_records = KeyHistory.query \
             .filter_by(user_id=user_id) \
             .order_by(KeyHistory.timestamp.desc()) \
             .limit(limit) \
             .all()
-
         history_list = []
         for record in history_records:
             # Get key directly instead of using record.used_key
@@ -583,7 +565,6 @@ def get_user_key_history(user_id):
                     "timestamp": record.timestamp.strftime("%Y-%m-%dT%H:%M:%S.%fZ") # ISO format often preferred by JS Date
                     # Fix Russian 'М' to 'M'
                 })
-
         return jsonify({
             "status": "success",
             "history": history_list
@@ -616,7 +597,6 @@ def create_category():
         data = request.get_json()
         if not data or not data.get('name'):
             return jsonify({"status": "error", "message": "Имя категории не может быть пустым"}), 400
-
         # Save the new category to the database
         # Assuming the column name is 'category' as per the model definition
         new_category = Category(category=data.get('name')) 
@@ -673,22 +653,18 @@ def keys_with_categories():
     try:
         keys = Key.query.all()
         keys_list = []
-
         for key in keys:
             # Fetch categories using the pre-defined relationship
             key_categories = []
             for category in key.categories:
                 key_categories.append({"id": category.id, "name": category.category})
-
             # Get last history record for this key
             last_history = KeyHistory.query.filter_by(key_id=key.id).order_by(KeyHistory.timestamp.desc()).first()
-
             user_name = None
             user_id = None
             if last_history and last_history.user:
                 user_name = last_history.user.fio
                 user_id = last_history.user.id
-
             keys_list.append({
                 "id": key.id,
                 "cab": key.cab,
@@ -716,15 +692,12 @@ def update_key_categories(key_id):
         key = Key.query.get(key_id)
         if not key:
             return jsonify({"status": "error", "message": "Ключ не найден"}), 404
-
         data = request.get_json()
         if not data or 'category_ids' not in data:
             return jsonify({"status": "error", "message": "Отсутствуют данные категорий"}), 400
-
         category_ids = data['category_ids']
         if not isinstance(category_ids, list):
             return jsonify({"status": "error", "message": "category_ids должен быть списком"}), 400
-
         # Get the categories and assign them directly using the relationship
         categories_to_assign = Category.query.filter(Category.id.in_(category_ids)).all()
         key.categories = categories_to_assign
@@ -747,61 +720,33 @@ def update_key_categories(key_id):
         print(f"Error updating key categories for key {key_id}: {e}")  # Log the error
         return jsonify({"status": "error", "message": f"Ошибка при обновлении категорий: {str(e)}"}), 500
 
+@api_blueprint.route('/available-keys-for-user/<int:user_id>', methods=['GET'])
+@cross_origin()
+def available_keys_for_user(user_id):
+    try:
+        user = Users.query.get(user_id)
+        if not user:
+            return jsonify({"status":"error","message":"Пользователь не найден"}), 404
 
+        user_cats     = {cat.id for cat in user.categories}
+        all_available = Key.query.filter_by(status=True).all()
+        result        = []
 
+        for key in all_available:
+            key_cats = {cat.id for cat in key.categories}
+            if user.admin or not key_cats or (user_cats & key_cats):
+                result.append({
+                    "id":        key.id,
+                    "cab":       key.cab,
+                    "corpus":    key.corpus,
+                    "status":    key.status,
+                    "available": key.status,
+                    "key_name":  f"{key.corpus}.{key.cab}",
+                    "categories":[{"id":c.id,"name":c.category} for c in key.categories]
+                })
 
+        return jsonify({"status":"success","keys":result}), 200
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        return jsonify({"status": "error", "message": f"Ошибка: {str(e)}"}), 500        print(f"Error fetching available keys for user {user_id}: {e}")    except Exception as e:        })            "keys": keys_list            "status": "success",        return jsonify({                        })                    "categories": [{"id": cat.id, "name": cat.category} for cat in key.categories]                    "key_name": f"{key.corpus}.{key.cab}",                    "available": key.status,                    "status": key.status,                    "corpus": key.corpus,                    "cab": key.cab,                    "id": key.id,                keys_list.append({            if can_access:                        can_access = user.admin or not key_categories or bool(user_categories & key_categories)            # 3. User has at least one category that matches key's categories            # 2. Key has no categories (public key)            # 1. User is admin            # User can access if:                        key_categories = set(cat.id for cat in key.categories)            # Get key categories        for key in available_keys:                user_categories = set(cat.id for cat in user.categories)        # Get user categories                keys_list = []        available_keys = Key.query.filter_by(status=True).all()        # Get all available keys (status=True)                    return jsonify({"status": "error", "message": "Пользователь не найден"}), 404        if not user:        user = Users.query.get(user_id)    try:def available_keys_for_user(user_id):@cross_origin()@api_blueprint.route('/available-keys-for-user/<int:user_id>', methods=['GET'])        updated_categories = [{"id": cat.id, "name": cat.category} for cat in key.categories]
-        
-        return jsonify({
-            "status": "success",
-            "message": "Категории ключа обновлены",
-            "key": {
-                "id": key.id,
-                "key_name": f"{key.corpus}.{key.cab}",
-                "categories": updated_categories
-            }
-        })
     except Exception as e:
-        db.session.rollback()
-        print(f"Error updating key categories for key {key_id}: {e}")  # Log the error
-        return jsonify({"status": "error", "message": f"Ошибка при обновлении категорий: {str(e)}"}), 500
+        print(f"Error in available-keys-for-user: {e}")
+        return jsonify({"status":"error","message":str(e)}), 500
