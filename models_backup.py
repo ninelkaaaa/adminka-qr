@@ -1,4 +1,4 @@
-from services import db
+from app import db
 from sqlalchemy.ext.associationproxy import association_proxy
 from datetime import datetime
 

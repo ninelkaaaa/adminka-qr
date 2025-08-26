@@ -9,7 +9,7 @@ CORS(app)
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'connect_args': {'options': '-c timezone=Asia/Almaty'}
 }
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:Yaya5197@localhost:5432/QRKEY'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://aituproject_user:b1KUlQGvxriUeBBnX3CMWGPeEcBRRziy@dpg-cvrk5g8gjchc73bbksq0-a/aituproject'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)

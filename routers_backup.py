@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from models import Users, Key, KeyHistory, Category, TransferRequest, key_category
 from flask_cors import cross_origin
-from services import db
+from app import db
 api_blueprint = Blueprint('api', __name__)
 
 @api_blueprint.route('/')
@@ -61,8 +61,6 @@ def all_keys():
                 user_name = last_history.user.fio
                 user_id = last_history.user.id
 
-            # Добавляем категории ключа
-            key_categories = [{"id": cat.id, "name": cat.category} for cat in key.categories]
                 
             keys_list.append({
                 "id": key.id,
@@ -72,9 +70,7 @@ def all_keys():
                 "available": key.status,
                 "last_user": user_name,
                 "last_user_id": user_id,
-                "key_name": f"{key.corpus}.{key.cab}",
-                "categories": key_categories,
-                "user_count": len(key_categories)  # Примерное количество пользователей с доступом
+                "key_name": f"{key.corpus}.{key.cab}"
             })
             
         return jsonify({
@@ -665,43 +661,6 @@ def update_key_categories(key_id):
         db.session.rollback()
         print(f"Error updating key categories for key {key_id}: {e}")
         return jsonify({"status": "error", "message": f"Ошибка при обновлении категорий: {str(e)}"}), 500
-
-@api_blueprint.route('/keys/bulk-update', methods=['PUT'])
-@cross_origin()
-def bulk_update_key_categories():
-    try:
-        data = request.get_json()
-        if not data or 'key_ids' not in data or 'category_ids' not in data:
-            return jsonify({"status": "error", "message": "Отсутствуют данные key_ids или category_ids"}), 400
-        
-        key_ids = data['key_ids']
-        category_ids = data['category_ids']
-        
-        if not isinstance(key_ids, list) or not isinstance(category_ids, list):
-            return jsonify({"status": "error", "message": "key_ids и category_ids должны быть списками"}), 400
-        
-        # Получаем ключи и категории
-        keys = Key.query.filter(Key.id.in_(key_ids)).all()
-        categories_to_assign = Category.query.filter(Category.id.in_(category_ids)).all()
-        
-        if len(keys) != len(key_ids):
-            return jsonify({"status": "error", "message": "Некоторые ключи не найдены"}), 404
-        
-        # Обновляем категории для всех ключей
-        for key in keys:
-            key.categories = categories_to_assign
-        
-        db.session.commit()
-        
-        return jsonify({
-            "status": "success",
-            "message": f"Категории обновлены для {len(keys)} ключей",
-            "updated_keys": len(keys)
-        })
-    except Exception as e:
-        db.session.rollback()
-        print(f"Error bulk updating key categories: {e}")
-        return jsonify({"status": "error", "message": f"Ошибка при массовом обновлении: {str(e)}"}), 500
 
 @api_blueprint.route('/available-keys-for-user/<int:user_id>', methods=['GET'])
 @cross_origin()
