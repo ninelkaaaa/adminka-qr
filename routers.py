@@ -1,7 +1,9 @@
 from flask import Blueprint, request, jsonify
-from models import Users, Key, KeyHistory, Category, TransferRequest, key_category
+from models import Users, Key, KeyHistory, Category, TransferRequest, key_category, user_categories
 from flask_cors import cross_origin
 from services import db
+from sqlalchemy import func
+from sqlalchemy.orm import subqueryload
 api_blueprint = Blueprint('api', __name__)
 
 @api_blueprint.route('/')
@@ -277,6 +279,44 @@ def return_key():
     db.session.commit()
     return jsonify({"status":"success","message":"Ключ сдан"}),200
 
+@api_blueprint.route('/admin/return-key', methods=['POST'])
+@cross_origin()
+def admin_return_key():
+    data = request.get_json()
+    key_id = data.get("key_id")
+
+    if not key_id:
+        return jsonify({"status": "error", "message": "key_id is required"}), 400
+
+    key = Key.query.get(key_id)
+    if not key:
+        return jsonify({"status": "error", "message": "Key not found"}), 404
+
+    if key.status is True:
+        return jsonify({"status": "error", "message": "Key is already available"}), 400
+
+    # Find the last user who was issued the key
+    last_issue_record = KeyHistory.query.filter_by(key_id=key_id, action='issue').order_by(KeyHistory.timestamp.desc()).first()
+    
+    if not last_issue_record:
+        # This case is unlikely if key.status is False, but as a safeguard
+        return jsonify({"status": "error", "message": "Could not find who this key was issued to"}), 404
+
+    # Create a new history record for the return
+    new_hist = KeyHistory(
+        user_id=last_issue_record.user_id,
+        key_id=key_id,
+        action="return"
+    )
+    db.session.add(new_hist)
+    
+    # Update the key status
+    key.status = True
+    
+    db.session.commit()
+    
+    return jsonify({"status": "success", "message": f"Ключ {key.corpus}.{key.cab} был возвращен администратором."}), 200
+
 @api_blueprint.route('/transfer-request', methods=['POST'])
 @cross_origin()
 def create_transfer_request():
@@ -537,8 +577,25 @@ def get_user_key_history(user_id):
 @cross_origin()
 def get_categories():
     try:
-        categories_query = Category.query.all()
-        categories_list = [{"id": cat.id, "name": cat.category} for cat in categories_query]
+        # Correctly count associated keys and users via association tables
+        categories_with_counts = db.session.query(
+            Category,
+            func.count(func.distinct(key_category.c.key_id)).label('keys_count'),
+            func.count(func.distinct(user_categories.c.user_id)).label('user_count')
+        ).outerjoin(key_category, Category.id == key_category.c.category_id)\
+         .outerjoin(user_categories, Category.id == user_categories.c.category_id)\
+         .group_by(Category.id)\
+         .all()
+
+        categories_list = []
+        for category, keys_count, user_count in categories_with_counts:
+            categories_list.append({
+                "id": category.id,
+                "name": category.category,
+                "keys_count": keys_count,
+                "user_count": user_count
+            })
+
         return jsonify({
             "status": "success",
             "categories": categories_list
