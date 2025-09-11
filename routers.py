@@ -59,9 +59,11 @@ def all_keys():
             
             user_name = None
             user_id = None
+            user_phone = None
             if last_history and last_history.user:
                 user_name = last_history.user.fio
                 user_id = last_history.user.id
+                user_phone = last_history.user.number  # номер телефона пользователя
 
             # Добавляем категории ключа
             key_categories = [{"id": cat.id, "name": cat.category} for cat in key.categories]
@@ -71,9 +73,10 @@ def all_keys():
                 "cab": key.cab,
                 "corpus": key.corpus,
                 "status": key.status,
-                "available": key.status,
+                "available": key.status,  # True = доступен, False = выдан
                 "last_user": user_name,
                 "last_user_id": user_id,
+                "phone": user_phone,  # добавляем номер телефона
                 "key_name": f"{key.corpus}.{key.cab}",
                 "categories": key_categories,
                 "user_count": len(key_categories)  # Примерное количество пользователей с доступом
