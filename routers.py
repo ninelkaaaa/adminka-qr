@@ -825,3 +825,33 @@ def delete_user(user_id):
         db.session.rollback()
         print(f"Error deleting user {user_id}: {e}")
         return jsonify({"status": "error", "message": f"Ошибка при удалении пользователя: {str(e)}"}), 500
+
+
+@api_blueprint.route('/contact-info', methods=['GET'])
+@cross_origin()
+def get_contact_info():
+    """Получить контактную информацию для администратора"""
+    try:
+        # Здесь можно добавить логику для получения из БД или конфига
+        # Пока возвращаем статичные данные
+        contact_info = {
+            "phone": "+7710504939",
+            "teacher_name": "Петров П.П",
+            "email": "admin@aitu.edu.kz",  # дополнительно
+            "office": "Кабинет 101"        # дополнительно
+        }
+        
+        return jsonify({
+            "status": "success",
+            "phone": contact_info["phone"],
+            "teacher_name": contact_info["teacher_name"],
+            "email": contact_info.get("email"),
+            "office": contact_info.get("office")
+        })
+        
+    except Exception as e:
+        print(f"Error getting contact info: {e}")
+        return jsonify({
+            "status": "error", 
+            "message": f"Ошибка при получении контактной информации: {str(e)}"
+        }), 500
