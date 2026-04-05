@@ -1,0 +1,25 @@
+
+services:
+  db:
+    image: postgres:17
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_DB: aituproject
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  web:
+    build: .
+    depends_on:
+      - db
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgresql://postgres:12345@db:5432/aituproject  # обращение к контейнеру db
+
+volumes:
+  db_data:
