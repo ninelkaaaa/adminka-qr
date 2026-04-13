@@ -7,6 +7,7 @@ from sqlalchemy.orm import subqueryload
 import json
 import numpy as np
 from flask import request, jsonify
+from face_service import get_embedding
 import json
 api_blueprint = Blueprint('api', __name__)
 
