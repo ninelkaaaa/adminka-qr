@@ -921,19 +921,43 @@ def save_face():
         image = request.files.get('image')
         user_id = request.form.get('user_id')
 
-        user = Users.query.get(user_id)
+        print("USER_ID:", user_id)
+
+        if not image or not user_id:
+            return jsonify({
+                "status": "error",
+                "message": "image or user_id missing"
+            }), 400
+
+        user = Users.query.get(int(user_id))
 
         if not user:
-            return jsonify({"status": "error", "message": "User not found"}), 404
+            return jsonify({
+                "status": "error",
+                "message": "User not found"
+            }), 404
+
+        # 🔥 ВАЖНО: сбрасываем поток (иначе иногда пустой файл)
+        image.stream.seek(0)
 
         embedding = get_embedding(image)
 
-        if embedding is None:
-            return jsonify({"status": "error", "message": "Face not detected"}), 400
+        print("EMBEDDING:", embedding)
 
+        if embedding is None:
+            return jsonify({
+                "status": "error",
+                "message": "Face not detected"
+            }), 400
+
+        # 🔥 сохраняем
         user.face_embedding = json.dumps(embedding.tolist())
 
+        db.session.add(user)
         db.session.commit()
+
+        # 🔥 проверка
+        print("SAVED TO DB:", user.face_embedding)
 
         return jsonify({
             "status": "success",
@@ -941,7 +965,9 @@ def save_face():
         }), 200
 
     except Exception as e:
+        db.session.rollback()
+        print("ERROR:", str(e))
         return jsonify({
             "status": "error",
             "message": str(e)
-        }), 500    
+        }), 500
