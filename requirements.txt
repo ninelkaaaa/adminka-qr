@@ -5,6 +5,5 @@ flask_sqlalchemy
 gunicorn
 psycopg2-binary
 python-dotenv
-numpy
-numpy
 opencv-python-headless
+numpy
