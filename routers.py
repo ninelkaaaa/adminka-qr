@@ -6,9 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import subqueryload
 import json
 import numpy as np
-from flask import request, jsonify
 from face_service import get_embedding
-import json
 api_blueprint = Blueprint('api', __name__)
 
 @api_blueprint.route('/')
@@ -865,96 +863,53 @@ def get_contact_info():
         }), 500
     
 
-# FACE LOGIN
-# =========================
-@api_blueprint.route("/face-login", methods=["POST"])
+@api_blueprint.route('/face-login', methods=['POST'])
 def face_login():
     try:
-        image = request.files.get("image")
+        image = request.files.get('image')
 
         if not image:
-            return jsonify({"error": "no image"}), 400
+            return jsonify({"status": "error", "message": "No image provided"}), 400
 
         embedding = get_embedding(image)
 
         if embedding is None:
-            return jsonify({"error": "no face detected"}), 400
+            return jsonify({"status": "error", "message": "Face not detected"}), 400
 
         users = Users.query.all()
 
-        best_user = None
+        best_match = None
         best_score = 0
 
         for user in users:
             if not user.face_embedding:
                 continue
 
-            stored = np.array(json.loads(user.face_embedding))
+            stored_embedding = np.array(json.loads(user.face_embedding))
 
-            score = np.dot(stored, embedding) / (
-                np.linalg.norm(stored) * np.linalg.norm(embedding)
+            score = np.dot(stored_embedding, embedding) / (
+                np.linalg.norm(stored_embedding) * np.linalg.norm(embedding)
             )
 
             if score > best_score:
                 best_score = score
-                best_user = user
+                best_match = user
 
-        if best_user and best_score > 0.5:
+        if best_match and best_score > 0.5:
             return jsonify({
                 "status": "success",
-                "user_id": best_user.id,
-                "name": best_user.fio,
+                "user_id": best_match.id,
+                "name": best_match.fio,
                 "score": float(best_score)
-            })
+            }), 200
 
-        return jsonify({"status": "not found"}), 401
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-# =========================
-# SAVE FACE
-# =========================
-@api_blueprint.route("/save-face", methods=["POST"])
-def save_face():
-    try:
-        print("SAVE FACE START")
-
-        image = request.files.get("image")
-        user_id = request.form.get("user_id")
-
-        print("USER_ID:", user_id)
-
-        if not image or not user_id:
-            return jsonify({"error": "missing data"}), 400
-
-        user = Users.query.get(int(user_id))
-
-        if not user:
-            return jsonify({"error": "user not found"}), 404
-
-        image.stream.seek(0)
-
-        embedding = get_embedding(image)
-
-        print("EMBEDDING:", embedding)
-
-        if embedding is None:
-            return jsonify({"error": "no face detected"}), 400
-
-        user.face_embedding = json.dumps(embedding.tolist())
-
-        db.session.add(user)
-
-        print("BEFORE COMMIT")
-        db.session.commit()
-        print("AFTER COMMIT")
-
-        return jsonify({"status": "saved"}), 200
+        return jsonify({
+            "status": "error",
+            "message": "User not recognized"
+        }), 401
 
     except Exception as e:
-        db.session.rollback()
-        print("ERROR:", str(e))
-
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
