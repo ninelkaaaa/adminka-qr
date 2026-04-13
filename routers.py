@@ -6,7 +6,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import subqueryload
 import json
 import numpy as np
-from face_service import get_embedding
+from flask import request, jsonify
+import json
 api_blueprint = Blueprint('api', __name__)
 
 @api_blueprint.route('/')

@@ -1,38 +1,39 @@
-import cv2
 import numpy as np
+import cv2
 import insightface
-from insightface.app import FaceAnalysis
 
-# 🔥 CPU ONLY (ВАЖНО для Railway)
-app = FaceAnalysis(
-    name="buffalo_l",
-    providers=['CPUExecutionProvider']
-)
+_model = None
 
-# 🔥 уменьшаем нагрузку (иначе worker падает)
-app.prepare(ctx_id=-1, det_size=(320, 320))
+
+def get_model():
+    global _model
+    if _model is None:
+        _model = insightface.app.FaceAnalysis(
+            name="buffalo_l",
+            providers=['CPUExecutionProvider']
+        )
+        _model.prepare(ctx_id=-1, det_size=(320, 320))
+    return _model
 
 
 def get_embedding(image_file):
     try:
-        # читаем файл
+        image_file.stream.seek(0)
+
         file_bytes = np.frombuffer(image_file.read(), np.uint8)
         img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
         if img is None:
-            print("IMAGE DECODE FAILED")
             return None
 
-        faces = app.get(img)
+        model = get_model()
+        faces = model.get(img)
 
         if not faces:
-            print("NO FACE FOUND")
             return None
 
-        embedding = faces[0].embedding
-        print("EMBEDDING GENERATED")
-        return embedding
+        return faces[0].embedding
 
     except Exception as e:
-        print("FACE ERROR:", str(e))
+        print("FACE ERROR:", e)
         return None

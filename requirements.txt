@@ -9,3 +9,5 @@ insightface
 onnxruntime
 opencv-python-headless
 numpy
+insightface
+onnxruntime
