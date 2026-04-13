@@ -918,6 +918,8 @@ def face_login():
 @api_blueprint.route('/save-face', methods=['POST'])
 def save_face():
     try:
+        print("SAVE FACE STARTED")
+
         image = request.files.get('image')
         user_id = request.form.get('user_id')
 
@@ -937,12 +939,10 @@ def save_face():
                 "message": "User not found"
             }), 404
 
-        # 🔥 ВАЖНО: сбрасываем поток (иначе иногда пустой файл)
+        # 🔥 обязательно reset потока
         image.stream.seek(0)
 
         embedding = get_embedding(image)
-
-        print("EMBEDDING:", embedding)
 
         if embedding is None:
             return jsonify({
@@ -950,14 +950,13 @@ def save_face():
                 "message": "Face not detected"
             }), 400
 
-        # 🔥 сохраняем
+        # 🔥 сохранение
         user.face_embedding = json.dumps(embedding.tolist())
 
         db.session.add(user)
         db.session.commit()
 
-        # 🔥 проверка
-        print("SAVED TO DB:", user.face_embedding)
+        print("SAVED TO DB SUCCESS")
 
         return jsonify({
             "status": "success",
@@ -966,7 +965,8 @@ def save_face():
 
     except Exception as e:
         db.session.rollback()
-        print("ERROR:", str(e))
+        print("SAVE FACE ERROR:", str(e))
+
         return jsonify({
             "status": "error",
             "message": str(e)
