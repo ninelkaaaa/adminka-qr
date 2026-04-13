@@ -2,12 +2,13 @@ import numpy as np
 import cv2
 from insightface.app import FaceAnalysis
 
+# CPU ONLY (Railway safe)
 app = FaceAnalysis(
     name="buffalo_l",
-    providers=['CPUExecutionProvider']
+    providers=["CPUExecutionProvider"]
 )
 
-app.prepare(ctx_id=-1, det_size=(320, 320))
+app.prepare(ctx_id=-1, det_size=(160, 160))
 
 
 def get_embedding(image_file):
@@ -16,11 +17,13 @@ def get_embedding(image_file):
         img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
         if img is None:
+            print("IMAGE DECODE FAILED")
             return None
 
         faces = app.get(img)
 
         if not faces:
+            print("NO FACE FOUND")
             return None
 
         return faces[0].embedding

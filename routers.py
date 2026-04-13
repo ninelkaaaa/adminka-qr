@@ -865,111 +865,96 @@ def get_contact_info():
         }), 500
     
 
-@api_blueprint.route('/face-login', methods=['POST'])
+# FACE LOGIN
+# =========================
+@api_blueprint.route("/face-login", methods=["POST"])
 def face_login():
     try:
-        image = request.files.get('image')
+        image = request.files.get("image")
 
         if not image:
-            return jsonify({"status": "error", "message": "No image provided"}), 400
+            return jsonify({"error": "no image"}), 400
 
         embedding = get_embedding(image)
 
         if embedding is None:
-            return jsonify({"status": "error", "message": "Face not detected"}), 400
+            return jsonify({"error": "no face detected"}), 400
 
         users = Users.query.all()
 
-        best_match = None
+        best_user = None
         best_score = 0
 
         for user in users:
             if not user.face_embedding:
                 continue
 
-            stored_embedding = np.array(json.loads(user.face_embedding))
+            stored = np.array(json.loads(user.face_embedding))
 
-            score = np.dot(stored_embedding, embedding) / (
-                np.linalg.norm(stored_embedding) * np.linalg.norm(embedding)
+            score = np.dot(stored, embedding) / (
+                np.linalg.norm(stored) * np.linalg.norm(embedding)
             )
 
             if score > best_score:
                 best_score = score
-                best_match = user
+                best_user = user
 
-        if best_match and best_score > 0.5:
+        if best_user and best_score > 0.5:
             return jsonify({
                 "status": "success",
-                "user_id": best_match.id,
-                "name": best_match.fio,
+                "user_id": best_user.id,
+                "name": best_user.fio,
                 "score": float(best_score)
-            }), 200
+            })
 
-        return jsonify({
-            "status": "error",
-            "message": "User not recognized"
-        }), 401
+        return jsonify({"status": "not found"}), 401
 
     except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
-    
+        return jsonify({"error": str(e)}), 500
 
-@api_blueprint.route('/save-face', methods=['POST'])
+
+# =========================
+# SAVE FACE
+# =========================
+@api_blueprint.route("/save-face", methods=["POST"])
 def save_face():
     try:
-        print("SAVE FACE STARTED")
+        print("SAVE FACE START")
 
-        image = request.files.get('image')
-        user_id = request.form.get('user_id')
+        image = request.files.get("image")
+        user_id = request.form.get("user_id")
 
         print("USER_ID:", user_id)
 
         if not image or not user_id:
-            return jsonify({
-                "status": "error",
-                "message": "image or user_id missing"
-            }), 400
+            return jsonify({"error": "missing data"}), 400
 
         user = Users.query.get(int(user_id))
 
         if not user:
-            return jsonify({
-                "status": "error",
-                "message": "User not found"
-            }), 404
+            return jsonify({"error": "user not found"}), 404
 
-        # 🔥 обязательно reset потока
         image.stream.seek(0)
 
         embedding = get_embedding(image)
 
-        if embedding is None:
-            return jsonify({
-                "status": "error",
-                "message": "Face not detected"
-            }), 400
+        print("EMBEDDING:", embedding)
 
-        # 🔥 сохранение
+        if embedding is None:
+            return jsonify({"error": "no face detected"}), 400
+
         user.face_embedding = json.dumps(embedding.tolist())
 
         db.session.add(user)
+
+        print("BEFORE COMMIT")
         db.session.commit()
+        print("AFTER COMMIT")
 
-        print("SAVED TO DB SUCCESS")
-
-        return jsonify({
-            "status": "success",
-            "message": "Face saved"
-        }), 200
+        return jsonify({"status": "saved"}), 200
 
     except Exception as e:
         db.session.rollback()
-        print("SAVE FACE ERROR:", str(e))
+        print("ERROR:", str(e))
 
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
