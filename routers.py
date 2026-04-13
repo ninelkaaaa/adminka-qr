@@ -4,6 +4,9 @@ from flask_cors import cross_origin
 from services import db
 from sqlalchemy import func
 from sqlalchemy.orm import subqueryload
+import json
+import numpy as np
+from face_service import get_embedding
 api_blueprint = Blueprint('api', __name__)
 
 @api_blueprint.route('/')
@@ -858,3 +861,87 @@ def get_contact_info():
             "status": "error", 
             "message": f"Ошибка при получении контактной информации: {str(e)}"
         }), 500
+    
+
+@api_blueprint.route('/face-login', methods=['POST'])
+def face_login():
+    try:
+        image = request.files.get('image')
+
+        if not image:
+            return jsonify({"status": "error", "message": "No image provided"}), 400
+
+        embedding = get_embedding(image)
+
+        if embedding is None:
+            return jsonify({"status": "error", "message": "Face not detected"}), 400
+
+        users = Users.query.all()
+
+        best_match = None
+        best_score = 0
+
+        for user in users:
+            if not user.face_embedding:
+                continue
+
+            stored_embedding = np.array(json.loads(user.face_embedding))
+
+            score = np.dot(stored_embedding, embedding) / (
+                np.linalg.norm(stored_embedding) * np.linalg.norm(embedding)
+            )
+
+            if score > best_score:
+                best_score = score
+                best_match = user
+
+        if best_match and best_score > 0.5:
+            return jsonify({
+                "status": "success",
+                "user_id": best_match.id,
+                "name": best_match.fio,
+                "score": float(best_score)
+            }), 200
+
+        return jsonify({
+            "status": "error",
+            "message": "User not recognized"
+        }), 401
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+    
+
+@api_blueprint.route('/save-face', methods=['POST'])
+def save_face():
+    try:
+        image = request.files.get('image')
+        user_id = request.form.get('user_id')
+
+        user = Users.query.get(user_id)
+
+        if not user:
+            return jsonify({"status": "error", "message": "User not found"}), 404
+
+        embedding = get_embedding(image)
+
+        if embedding is None:
+            return jsonify({"status": "error", "message": "Face not detected"}), 400
+
+        user.face_embedding = json.dumps(embedding.tolist())
+
+        db.session.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Face saved"
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500    
