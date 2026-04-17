@@ -2,9 +2,9 @@ from flask import Blueprint, request, jsonify
 from models import Users, Key, KeyHistory, Category, TransferRequest, key_category, user_categories
 from flask_cors import cross_origin
 from services import db
-from models import Users
 from sqlalchemy import func
 from sqlalchemy.orm import subqueryload
+from routers import api_blueprint
 api_blueprint = Blueprint('api', __name__)
 
 @api_blueprint.route('/')
@@ -860,43 +860,28 @@ def get_contact_info():
             "message": f"Ошибка при получении контактной информации: {str(e)}"
         }), 500
     
+    
+    
 @api_blueprint.route('/save-face', methods=['POST'])
 def save_face():
     try:
-        image = request.files.get('image')
+        user_id = request.json.get("user_id")
+        embedding = request.json.get("embedding")
 
-        if not image:
-            return jsonify({"error": "no image"}), 400
+        if not user_id or not embedding:
+            return jsonify({"status": "error", "message": "missing data"}), 400
 
-        # 🔥 ЖЁСТКО ФИКСИРУЕМ USER ID
-        user = Users.query.filter_by(id=11).first()
+        user = Users.query.get(int(user_id))
 
         if not user:
-            return jsonify({"error": "user 11 not found"}), 404
+            return jsonify({"status": "error", "message": "user not found"}), 404
 
-        # читаем фото
-        image.stream.seek(0)
-        image_bytes = image.read()
-
-        import base64
-        encoded = base64.b64encode(image_bytes).decode('utf-8')
-
-        print("UPDATING USER ID:", user.id)
-        print("ENCODE SIZE:", len(encoded))
-
-        # сохраняем
-        user.face_embedding = encoded
+        user.face_embedding = json.dumps(embedding)
 
         db.session.commit()
 
-        print("COMMIT DONE")
-
-        return jsonify({
-            "status": "success",
-            "user_id": user.id
-        }), 200
+        return jsonify({"status": "success"}), 200
 
     except Exception as e:
         db.session.rollback()
-        print("ERROR:", str(e))
-        return jsonify({"error": str(e)}), 500    
+        return jsonify({"status": "error", "message": str(e)}), 500    
