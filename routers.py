@@ -4,8 +4,6 @@ from flask_cors import cross_origin
 from services import db
 from sqlalchemy import func
 from sqlalchemy.orm import subqueryload
-from models import Users
-
 api_blueprint = Blueprint('api', __name__)
 
 @api_blueprint.route('/')
@@ -860,39 +858,3 @@ def get_contact_info():
             "status": "error", 
             "message": f"Ошибка при получении контактной информации: {str(e)}"
         }), 500
-    
-@api_blueprint.route("/save-face", methods=["POST"])
-def save_face():
-    try:
-        print("🔥 SAVE FACE HIT")
-
-        data = request.get_json(silent=True)
-        print("DATA:", data)
-
-        if not data:
-            return jsonify({"status": "error", "message": "No JSON received"}), 400
-
-        user_id = int(data.get("user_id"))
-        embedding = data.get("embedding")
-
-        if not user_id or not embedding:
-            return jsonify({"status": "error", "message": "Missing fields"}), 400
-
-        user = Users.query.get(user_id)
-        print("USER FOUND:", user)
-
-        if not user:
-            return jsonify({"status": "error", "message": "User not found"}), 404
-
-        user.face_embedding = json.dumps(embedding)
-
-        db.session.commit()
-
-        print("✅ SAVED TO DB")
-
-        return jsonify({"status": "success"}), 200
-
-    except Exception as e:
-        db.session.rollback()
-        print("❌ ERROR:", str(e))
-        return jsonify({"status": "error", "message": str(e)}), 500
