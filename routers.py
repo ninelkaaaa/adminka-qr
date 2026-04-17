@@ -859,33 +859,21 @@ def get_contact_info():
             "message": f"Ошибка при получении контактной информации: {str(e)}"
         }), 500
     
-@app.route("/save-face", methods=["POST"])
+@api.route("/save-face", methods=["POST"])
 def save_face():
     data = request.get_json()
 
     user_id = data.get("user_id")
     embedding = data.get("embedding")
 
-    if not user_id or not embedding:
-        return jsonify({"error": "missing data"}), 400
+    cur = conn.cursor()
 
-    try:
-        cur = conn.cursor()
+    cur.execute("""
+        UPDATE users
+        SET face_embedding = %s
+        WHERE id = %s
+    """, (json.dumps(embedding), user_id))
 
-        cur.execute("""
-            UPDATE users
-            SET face_embedding = %s
-            WHERE id = %s
-        """, (json.dumps(embedding), user_id))
+    conn.commit()
 
-        conn.commit()
-
-        return jsonify({
-            "status": "ok",
-            "user_id": user_id,
-            "saved_length": len(embedding)
-        })
-
-    except Exception as e:
-        conn.rollback()
-        return jsonify({"error": str(e)}), 500    
+    return jsonify({"status": "ok"})    
