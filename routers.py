@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from models import Users, Key, KeyHistory, Category, TransferRequest, key_category, user_categories
 from flask_cors import cross_origin
 from services import db
+from models import Users
 from sqlalchemy import func
 from sqlalchemy.orm import subqueryload
 api_blueprint = Blueprint('api', __name__)
@@ -857,4 +858,48 @@ def get_contact_info():
         return jsonify({
             "status": "error", 
             "message": f"Ошибка при получении контактной информации: {str(e)}"
+        }), 500
+    
+@api_blueprint.route('/save-face', methods=['POST'])
+def save_face():
+    try:
+        image = request.files.get('image')
+        user_id = request.form.get('user_id')
+
+        if not image or not user_id:
+            return jsonify({
+                "status": "error",
+                "message": "image or user_id missing"
+            }), 400
+
+        user = Users.query.get(int(user_id))
+
+        if not user:
+            return jsonify({
+                "status": "error",
+                "message": "User not found"
+            }), 404
+
+        # 👉 читаем фото как bytes
+        image_bytes = image.read()
+
+        # 👉 сохраняем как base64 (в БД)
+        import base64
+        encoded = base64.b64encode(image_bytes).decode('utf-8')
+
+        user.face_embedding = encoded
+
+        db.session.add(user)
+        db.session.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Face saved"
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "status": "error",
+            "message": str(e)
         }), 500
