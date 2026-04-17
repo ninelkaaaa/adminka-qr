@@ -864,42 +864,39 @@ def get_contact_info():
 def save_face():
     try:
         image = request.files.get('image')
-        user_id = request.form.get('user_id')
 
-        if not image or not user_id:
-            return jsonify({
-                "status": "error",
-                "message": "image or user_id missing"
-            }), 400
+        if not image:
+            return jsonify({"error": "no image"}), 400
 
-        user = Users.query.get(int(user_id))
+        # 🔥 ЖЁСТКО ФИКСИРУЕМ USER ID
+        user = Users.query.filter_by(id=11).first()
 
         if not user:
-            return jsonify({
-                "status": "error",
-                "message": "User not found"
-            }), 404
+            return jsonify({"error": "user 11 not found"}), 404
 
-        # 👉 читаем фото как bytes
+        # читаем фото
+        image.stream.seek(0)
         image_bytes = image.read()
 
-        # 👉 сохраняем как base64 (в БД)
         import base64
         encoded = base64.b64encode(image_bytes).decode('utf-8')
 
+        print("UPDATING USER ID:", user.id)
+        print("ENCODE SIZE:", len(encoded))
+
+        # сохраняем
         user.face_embedding = encoded
 
-        db.session.add(user)
         db.session.commit()
+
+        print("COMMIT DONE")
 
         return jsonify({
             "status": "success",
-            "message": "Face saved"
+            "user_id": user.id
         }), 200
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
+        print("ERROR:", str(e))
+        return jsonify({"error": str(e)}), 500    
