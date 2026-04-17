@@ -4,7 +4,46 @@ from flask_cors import cross_origin
 from services import db
 from sqlalchemy import func
 from sqlalchemy.orm import subqueryload
+import json
+import math
+
 api_blueprint = Blueprint('api', __name__)
+
+FACE_MATCH_THRESHOLD = 0.92
+
+
+def _parse_embedding(raw_embedding):
+    if raw_embedding is None:
+        return None
+
+    if isinstance(raw_embedding, str):
+        raw_embedding = json.loads(raw_embedding)
+
+    if not isinstance(raw_embedding, list) or not raw_embedding:
+        raise ValueError("face_embedding must be a non-empty list")
+
+    parsed = []
+    for value in raw_embedding:
+        parsed.append(float(value))
+    return parsed
+
+
+def _serialize_embedding(embedding):
+    return json.dumps(embedding, separators=(",", ":"))
+
+
+def _cosine_similarity(first_embedding, second_embedding):
+    if len(first_embedding) != len(second_embedding):
+        raise ValueError("Embeddings must have the same length")
+
+    dot_product = sum(a * b for a, b in zip(first_embedding, second_embedding))
+    first_norm = math.sqrt(sum(a * a for a in first_embedding))
+    second_norm = math.sqrt(sum(b * b for b in second_embedding))
+
+    if first_norm == 0 or second_norm == 0:
+        raise ValueError("Embedding norm cannot be zero")
+
+    return dot_product / (first_norm * second_norm)
 
 @api_blueprint.route('/')
 def index():
@@ -27,6 +66,73 @@ def login():
         })
     else:
         return jsonify({"status": "error", "message": "Неверный логин или пароль"}), 401
+
+
+@api_blueprint.route('/users/<int:user_id>/face-enrollment', methods=['POST'])
+@cross_origin()
+def enroll_face(user_id):
+    user = Users.query.get(user_id)
+    if not user:
+        return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
+
+    data = request.get_json() or {}
+    raw_embedding = data.get('face_embedding') or data.get('embedding')
+
+    try:
+        embedding = _parse_embedding(raw_embedding)
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        return jsonify({"status": "error", "message": f"Некорректный face_embedding: {exc}"}), 400
+
+    user.face_embedding = _serialize_embedding(embedding)
+    db.session.commit()
+
+    return jsonify({
+        "status": "success",
+        "message": "Шаблон лица сохранен",
+        "user_id": user.id,
+        "embedding_size": len(embedding)
+    }), 200
+
+
+@api_blueprint.route('/login/face', methods=['POST'])
+@cross_origin()
+def login_with_face():
+    data = request.get_json() or {}
+    user_id = data.get('user_id')
+    raw_embedding = data.get('face_embedding') or data.get('embedding')
+
+    if not user_id:
+        return jsonify({"status": "error", "message": "user_id is required"}), 400
+
+    user = Users.query.get(user_id)
+    if not user:
+        return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
+
+    if not user.face_embedding:
+        return jsonify({"status": "error", "message": "Для пользователя не зарегистрировано лицо"}), 400
+
+    try:
+        current_embedding = _parse_embedding(raw_embedding)
+        saved_embedding = _parse_embedding(user.face_embedding)
+        similarity = _cosine_similarity(saved_embedding, current_embedding)
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        return jsonify({"status": "error", "message": f"Ошибка сравнения лица: {exc}"}), 400
+
+    if similarity < FACE_MATCH_THRESHOLD:
+        return jsonify({
+            "status": "error",
+            "message": "Лицо не совпало",
+            "similarity": round(similarity, 5)
+        }), 401
+
+    return jsonify({
+        "status": "success",
+        "message": "Вход выполнен",
+        "code": 200,
+        "admin": user.admin,
+        "user_id": user.id,
+        "similarity": round(similarity, 5)
+    }), 200
 
 
 @api_blueprint.route('/key-stats', methods=['GET'])
@@ -434,6 +540,7 @@ def get_users():
                 "status": "Admin" if user.admin else "Active",
                 "key": current_key_name,
                 "phone": user.number,
+                "face_registered": bool(user.face_embedding),
                 "categories": user_categories
             })
         return jsonify({"status": "success", "users": users_list}), 200
@@ -478,6 +585,7 @@ def update_user(user_id):
                  "name": user.fio,
                  "phone": user.number,
                  "status": "Admin" if user.admin else "Active",
+                 "face_registered": bool(user.face_embedding),
                  "categories": updated_categories
             }
         }), 200
@@ -535,6 +643,7 @@ def create_user():
                 "name":new_user.fio,
                 "phone": new_user.number,
                 "status": "Admin" if new_user.admin else "Active",
+                "face_registered": bool(new_user.face_embedding),
                 "categories": assigned_categories
             }
         }), 201

@@ -32,6 +32,7 @@ class Users(db.Model):
     fio      = db.Column(db.Text, nullable=False)
     number   = db.Column(db.String(20), nullable=False)
     password = db.Column(db.Text, nullable=False)
+    face_embedding = db.Column(db.Text, nullable=True)
     role_id  = db.Column(db.Integer, db.ForeignKey('role.id'))
     admin    = db.Column(db.Boolean, default=False)
 
