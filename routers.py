@@ -5,7 +5,7 @@ from services import db
 from sqlalchemy import func
 from sqlalchemy.orm import subqueryload
 from models import Users
-import json
+
 api_blueprint = Blueprint('api', __name__)
 
 @api_blueprint.route('/')
@@ -863,22 +863,36 @@ def get_contact_info():
     
 @api_blueprint.route("/save-face", methods=["POST"])
 def save_face():
-    data = request.get_json()
+    try:
+        print("🔥 SAVE FACE HIT")
 
-    user_id = data.get("user_id")
-    embedding = data.get("embedding")
+        data = request.get_json(silent=True)
+        print("DATA:", data)
 
-    if not user_id or not embedding:
-        return jsonify({"status": "error", "message": "missing data"}), 400
+        if not data:
+            return jsonify({"status": "error", "message": "No JSON received"}), 400
 
-    user = Users.query.get(user_id)
+        user_id = int(data.get("user_id"))
+        embedding = data.get("embedding")
 
-    if not user:
-        return jsonify({"status": "error", "message": "user not found"}), 404
+        if not user_id or not embedding:
+            return jsonify({"status": "error", "message": "Missing fields"}), 400
 
-    # сохраняем embedding как JSON строку
-    user.face_embedding = json.dumps(embedding)
+        user = Users.query.get(user_id)
+        print("USER FOUND:", user)
 
-    db.session.commit()
+        if not user:
+            return jsonify({"status": "error", "message": "User not found"}), 404
 
-    return jsonify({"status": "success"})    
+        user.face_embedding = json.dumps(embedding)
+
+        db.session.commit()
+
+        print("✅ SAVED TO DB")
+
+        return jsonify({"status": "success"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("❌ ERROR:", str(e))
+        return jsonify({"status": "error", "message": str(e)}), 500
