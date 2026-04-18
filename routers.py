@@ -98,25 +98,50 @@ def enroll_face(user_id):
 @cross_origin()
 def login_with_face():
     data = request.get_json() or {}
-    user_id = data.get('user_id')
     raw_embedding = data.get('face_embedding') or data.get('embedding')
-
-    if not user_id:
-        return jsonify({"status": "error", "message": "user_id is required"}), 400
-
-    user = Users.query.get(user_id)
-    if not user:
-        return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
-
-    if not user.face_embedding:
-        return jsonify({"status": "error", "message": "Для пользователя не зарегистрировано лицо"}), 400
 
     try:
         current_embedding = _parse_embedding(raw_embedding)
-        saved_embedding = _parse_embedding(user.face_embedding)
-        similarity = _cosine_similarity(saved_embedding, current_embedding)
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
         return jsonify({"status": "error", "message": f"Ошибка сравнения лица: {exc}"}), 400
+
+    user_id = data.get('user_id')
+    if user_id:
+        user = Users.query.get(user_id)
+        if not user:
+            return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
+        if not user.face_embedding:
+            return jsonify({"status": "error", "message": "Для пользователя не зарегистрировано лицо"}), 400
+
+        try:
+            saved_embedding = _parse_embedding(user.face_embedding)
+            similarity = _cosine_similarity(saved_embedding, current_embedding)
+        except (ValueError, TypeError, json.JSONDecodeError) as exc:
+            return jsonify({"status": "error", "message": f"Ошибка сравнения лица: {exc}"}), 400
+    else:
+        best_user = None
+        best_similarity = -1.0
+
+        users_with_face = Users.query.filter(Users.face_embedding.isnot(None)).all()
+        if not users_with_face:
+            return jsonify({"status": "error", "message": "Нет пользователей с зарегистрированным лицом"}), 404
+
+        for candidate in users_with_face:
+            try:
+                saved_embedding = _parse_embedding(candidate.face_embedding)
+                candidate_similarity = _cosine_similarity(saved_embedding, current_embedding)
+            except (ValueError, TypeError, json.JSONDecodeError):
+                continue
+
+            if candidate_similarity > best_similarity:
+                best_similarity = candidate_similarity
+                best_user = candidate
+
+        if best_user is None:
+            return jsonify({"status": "error", "message": "Не удалось сравнить лицо"}), 400
+
+        user = best_user
+        similarity = best_similarity
 
     if similarity < FACE_MATCH_THRESHOLD:
         return jsonify({
